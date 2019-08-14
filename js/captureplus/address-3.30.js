@@ -1,9 +1,9 @@
-/*! Copyright � 2009-2014 Postcode Anywhere (Holdings) Ltd. (http://www.postcodeanywhere.co.uk)
+﻿/*! Copyright © 2009-2014 Postcode Anywhere (Holdings) Ltd. (http://www.postcodeanywhere.co.uk)
  *
- * Address v3.20
+ * Address v3.30
  * Component for address lookup integrations.
  *
- * WEB-1-1 11/04/2014 10:15:37
+ * WEB-1-1 10/10/2014 08:28:57
  */
 /** @namespace pca */
 (function (window, undefined) {
@@ -32,21 +32,21 @@
 
     //Basic diacritic replacements.
     pca.diacritics = [
-        { r: /[����]/gi, w: "A" },
-        { r: /�/gi, w: "AA" },
-        { r: /[���]/gi, w: "AE" },
-        { r: /�/gi, w: "C" },
-        { r: /�/gi, w: "DJ" },
-        { r: /[����]/gi, w: "E" },
-        { r: /[���]/gi, w: "I" },
-        { r: /�/gi, w: "N" },
-        { r: /[����]/gi, w: "O" },
-        { r: /[���]/gi, w: "OE" },
-        { r: /�/gi, w: "SH" },
-        { r: /�/gi, w: "SS" },
-        { r: /[���]/gi, w: "U" },
-        { r: /�/gi, w: "UE" },
-        { r: /[��]/gi, w: "ZH" },
+        { r: /[ÀÁÂÃ]/gi, w: "A" },
+        { r: /Å/gi, w: "AA" },
+        { r: /[ÆæÄ]/gi, w: "AE" },
+        { r: /Ç/gi, w: "C" },
+        { r: /Ð/gi, w: "DJ" },
+        { r: /[ÈÉÊË]/gi, w: "E" },
+        { r: /[ÌÍÏ]/gi, w: "I" },
+        { r: /Ñ/gi, w: "N" },
+        { r: /[ÒÓÔÕ]/gi, w: "O" },
+        { r: /[ŒØÖ]/gi, w: "OE" },
+        { r: /Š/gi, w: "SH" },
+        { r: /ß/gi, w: "SS" },
+        { r: /[ÙÚÛ]/gi, w: "U" },
+        { r: /Ü/gi, w: "UE" },
+        { r: /[ŸÝ]/gi, w: "ZH" },
         { r: /-/gi, w: " " },
         { r: /[.,]/gi, w: "" }
     ];
@@ -61,8 +61,10 @@
     ];
 
     //Current service requests.
-    pca.requests = [];
+    //pca.requests = [];
     pca.requestQueue = [];
+    pca.requestCache = {};
+    pca.scriptRequests = [];
     pca.waitingRequest = false;
     pca.blockRequests = false;
 
@@ -74,6 +76,9 @@
 
     //Container for page elements.
     pca.container = null;
+
+    //store local reference to XHR
+    pca.XMLHttpRequest = window.XMLHttpRequest;
 
     //Ready state. 
     var ready = false,
@@ -222,6 +227,15 @@
         request.post = !!request.data.$post; //force the request to be made using a HTTP POST
         request.credentials = !!request.data.$credentials; //send request credentials such as cookies
 
+        //build the basic request url
+        request.destination = ~request.service.indexOf("//") ? request.service : pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint;
+        request.query = "";
+
+        for (var p in request.data)
+            request.query += (request.query ? "&" : "") + p + "=" + encodeURIComponent(request.data[p]);
+
+        request.url = request.destination + "?" + request.query;
+
         request.callback = function (response) {
             request.response = response;
             processResponse(request);
@@ -235,8 +249,8 @@
             request.error("Webservice request timed out.");
         }
 
-        request.index = pca.requests.length;
-        pca.requests.push(request);
+        //request.index = pca.requests.length;
+        //pca.requests.push(request);
 
         /** Callback for a successful request.
         * @callback pca.Request~successCallback
@@ -248,7 +262,14 @@
         * @param {string} message - The error text. */
     }
 
-    /** Simple method for making a Postcode Anywhere service request 
+    /** Processes a webservice request
+    * @memberof pca
+    * @param {pca.Request} request - The request to process */
+    pca.process = function(request) {
+        processRequest(request);
+    }
+
+    /** Simple method for making a Postcode Anywhere service request and processing it
     * @memberof pca
     * @param {string} service - The service name. e.g. CapturePlus/Interactive/Find/v1.00
     * @param {Object} [data] - An object containing request parameters, such as key.
@@ -267,7 +288,7 @@
 
         //block requests if the flag is set, ignore all but the last request in this state
         if (pca.blockRequests && pca.waitingRequest) {
-            pca.requestQueue = [request.index];
+            pca.requestQueue = [request];
             return;
         }
 
@@ -275,44 +296,21 @@
             pca.blockRequests = true;
 
         //queue the request if flag is set
-        if (request.queue) {
-            if (pca.waitingRequest) {
-                pca.requestQueue.push(request.index);
-                return;
-            }
+        if (request.queue && pca.waitingRequest) {
+            pca.requestQueue.push(request);
+            return;
         }
 
         pca.waitingRequest = true;
 
         //check the cache if the flag is set
-        if (request.cache) {
-            for (var i = 0; i < pca.requests.length; i++) {
-                if (pca.requests[i] && pca.requests[i].service === request.service && pca.requests[i].response) {
-                    var cacheHit = true;
-
-                    for (var d in request.data) {
-                        if (request.data[d] !== pca.requests[i].data[d]) {
-                            cacheHit = false;
-                            break;
-                        }
-                    }
-
-                    if (cacheHit) {
-                        //callback must be async
-                        function ayncCallback() {
-                            request.callback(pca.requests[i].response);
-                        }
-
-                        if (window.setImmediate)
-                            window.setImmediate(ayncCallback);
-                        else
-                            window.setTimeout(ayncCallback, 1);
-
-                        pca.requests[request.index] = null;
-                        return;
-                    }
-                }
+        if (request.cache && pca.requestCache[request.url]) {
+            function ayncCallback() {
+                request.callback(pca.requestCache[request.url].response);
             }
+
+            window.setImmediate ? window.setImmediate(ayncCallback) : window.setTimeout(ayncCallback, 1);
+            return;
         }
 
         //make the request
@@ -331,11 +329,14 @@
         else
             request.success(request.response.Items, request.response);
 
-        if (!request.cache)
-            pca.requests[request.index] = null;
+        if (request.cache)
+            pca.requestCache[request.url] = request;
+
+        if (request.position)
+            pca.scriptRequests[request.position - 1] = null;
 
         if (pca.requestQueue.length)
-            processRequest(pca.requests[pca.requestQueue.shift()]);
+            processRequest(pca.requestQueue.shift());
     }
 
     //Makes a GET request using best method available.
@@ -346,17 +347,10 @@
 
     //Makes a service request using a XMLHttpRequest GET method.
     function getRequestXHR(request) {
-        var xhr = new XMLHttpRequest(),
-            url = pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint,
-            query = "";
-
-        for (var i in request.data)
-            query += (query ? "&" : "?") + i + "=" + encodeURIComponent(request.data[i]);
-
-        url += query;
+        var xhr = new pca.XMLHttpRequest();
 
         //if the URL length is long and likely to cause problems with URL limits, so we should make a POST request
-        if (url.length > pca.limit) {
+        if (request.url.length > pca.limit) {
             request.post = true;
             postRequest(request);
         }
@@ -371,7 +365,7 @@
 
             xhr.onerror = request.serviceError;
             xhr.ontimeout = request.timeoutError;
-            xhr.open("GET", url, true);
+            xhr.open("GET", request.url, true);
             xhr.send();
         }
     }
@@ -379,15 +373,11 @@
     //Makes a service request using a script GET method.
     function getRequestScript(request) {
         var script = pca.create("script", { type: "text/javascript", async: "async" }),
-            head = document.getElementsByTagName("head")[0],
-            url = pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint,
-            query = "";
+            head = document.getElementsByTagName("head")[0];
 
-        for (var i in request.data)
-            query += (query ? "&" : "?") + i + "=" + encodeURIComponent(request.data[i]);
-
-        query += "&callback=pca.requests[" + request.index + "].callback";
-        script.src = url + query;
+        //set a callback point
+        request.position = pca.scriptRequests.push(request);
+        script.src = request.url + "&callback=pca.scriptRequests[" + (request.position - 1) + "].callback";
 
         script.onload = script.onreadystatechange = function () {
             if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") {
@@ -414,26 +404,21 @@
 
     ///Makes a service request using a XMLHttpRequest POST method.
     function postRequestXHR(request) {
-        var xhr = new XMLHttpRequest(),
-            url = pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint,
-            query = "";
-
-        for (var i in request.data)
-            query += (query ? "&" : "") + i + "=" + encodeURIComponent(request.data[i]);
+        var xhr = new pca.XMLHttpRequest();
 
         xhr.onreadystatechange = function () {
             if (xhr.readyState == 4 && xhr.status == 200)
                 request.callback(pca.parseJSON(xhr.responseText));
         }
-
+        
         if (request.credentials)
             xhr.withCredentials = request.credentials;
-
+        
         xhr.onerror = request.serviceError;
         xhr.ontimeout = request.timeoutError;
-        xhr.open("POST", url, true);
+        xhr.open("POST", request.destination, true);
         xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        xhr.send(query);
+        xhr.send(request.query);
     }
 
     //Makes a service request using a form POST method. 
@@ -571,7 +556,7 @@
 
         /** The user is pressed down on the item.
         * @fires mousedown */
-        item.mousedown = function () {
+        item.mousedown = function() {
             item.fire("mousedown");
         }
 
@@ -649,8 +634,8 @@
         collection.count = 0;
         collection.firstItem = null;
         collection.lastItem = null;
-        collection.firstItemClass = "pcafirstitem";
-        collection.lastItemClass = "pcalastitem";
+        collection.firstVisibleItem = null;
+        collection.lastVisibleItem = null;
 
         /** Populates the collection with new items.
         * @param {Array.<Object>|Object} data - Data objects to add e.g. a response array from a service.
@@ -683,7 +668,8 @@
             else createItem(data);
 
             collection.count += data.length;
-            collection.markItems();
+            collection.firstVisibleItem = collection.firstItem = collection.items[0];
+            collection.lastVisibleItem = collection.lastItem = collection.items[collection.items.length - 1];
             collection.fire("add", additions);
 
             return collection;
@@ -720,11 +706,16 @@
                 count = collection.count;
 
             collection.count = 0;
+            collection.firstVisibleItem = null;
+            collection.lastVisibleItem = null;
 
             collection.all(function (item) {
                 if (~item.tag.indexOf(tag)) {
                     item.show();
                     collection.count++;
+
+                    collection.firstVisibleItem = collection.firstVisibleItem || item;
+                    collection.lastVisibleItem = item;
                 }
                 else
                     item.hide();
@@ -759,6 +750,8 @@
             collection.highlighted = -1;
             collection.firstItem = null;
             collection.lastItem = null;
+            collection.firstVisibleItem = null;
+            collection.lastVisibleItem = null;
 
             collection.fire("clear");
 
@@ -849,19 +842,17 @@
             return collection.last();
         }
 
-        /** Marks the first and last items in the list with a CSS class */
-        collection.markItems = function () {
-            if (collection.firstItem) pca.removeClass(collection.firstItem.element, collection.firstItemClass);
-            if (collection.lastItem) pca.removeClass(collection.lastItem.element, collection.lastItemClass);
+        /** Returns all items that are visible in the list.
+        * @returns {Array.<pca.Item>} The items that are visible. */
+        collection.visibleItems = function () {
+            var visible = [];
 
-            if (collection.items.length) {
-                collection.firstItem = collection.items[0];
-                collection.lastItem = collection.items[collection.items.length - 1];
+            collection.all(function (item) {
+                if (item.visible)
+                    visible.push(item);
+            });
 
-                pca.addClass(collection.firstItem.element, collection.firstItemClass);
-                pca.addClass(collection.lastItem.element, collection.lastItemClass);
-            }
-
+            return visible;
         }
 
         return collection;
@@ -914,6 +905,20 @@
             dx: 0,
             dy: 0
         }
+        list.highlightedItem = null;
+        /** An item that will always be displayed first in the list.
+        * @type {pca.Item} */
+        list.headerItem = null;
+        /** An item that will always be displayed last in the list.
+        * @type {pca.Item} */
+        list.footerItem = null;
+        list.firstItem = null;
+        list.lastItem = null;
+        list.firstItemClass = "pcafirstitem";
+        list.lastItemClass = "pcalastitem";
+
+        list.options.minItems = list.options.minItems || 0;
+        list.options.maxItems = list.options.maxItems || 10;
 
         /** Shows the list.
         * @fires show */
@@ -921,6 +926,7 @@
             list.visible = true;
             list.element.style.display = "";
             list.fire("show");
+            list.resize();
 
             return list;
         }
@@ -940,13 +946,33 @@
         list.draw = function () {
             list.destroy();
 
+            if (list.headerItem)
+                list.element.appendChild(list.headerItem.element);
+
             list.collection.all(function (item) {
                 list.element.appendChild(item.element);
             })
 
-            list.fire("draw");
+            if (list.footerItem)
+                list.element.appendChild(list.footerItem.element);
+
+            list.resize();
+            list.fire("draw");  
 
             return list;
+        }
+
+        /** Marks the first and last items in the list with a CSS class */
+        list.markItems = function () {
+            if (list.firstItem) pca.removeClass(list.firstItem.element, list.firstItemClass);
+            if (list.lastItem) pca.removeClass(list.lastItem.element, list.lastItemClass);
+
+            if (list.collection.count) {
+                list.firstItem = list.headerItem || list.collection.firstVisibleItem;
+                list.lastItem = list.footerItem || list.collection.lastVisibleItem;
+                pca.addClass(list.firstItem.element, list.firstItemClass);
+                pca.addClass(list.lastItem.element, list.lastItemClass);
+            }
         }
 
         /** Adds items to the list collection. 
@@ -1035,6 +1061,10 @@
         list.move = function (item) {
             if (item) {
                 list.collection.highlight(item);
+
+                if (item == list.headerItem || item == list.footerItem)
+                    item.highlight();
+
                 list.scrollToItem(item);
             }
 
@@ -1043,34 +1073,56 @@
 
         /** Moves to the next item in the list. */
         list.next = function () {
-            return list.move(list.collection.next());
+            return list.move(list.nextItem());
         }
 
         /** Moves to the previous item in the list */
         list.previous = function () {
-            return list.move(list.collection.previous());
+            return list.move(list.previousItem());
         }
 
         /** Moves to the first item in the list. */
         list.first = function () {
-            return list.move(list.collection.first());
+            return list.move(list.firstItem);
         }
 
         /** Moves to the last item in the list. */
         list.last = function () {
-            return list.move(list.collection.last());
+            return list.move(list.lastItem);
         }
 
-        /** Returns the first item.
-        * @returns {pca.Item} The current item. */
-        list.firstItem = function () {
-            return list.collection.first();
+        /** Returns the next item.
+        * @returns {pca.Item} The next item. */
+        list.nextItem = function() {
+            if (!list.highlightedItem) return list.firstItem;
+
+            if (list.highlightedItem == list.collection.lastVisibleItem && (list.footerItem || list.headerItem))
+                return list.footerItem || list.headerItem;
+
+            if (list.footerItem && list.headerItem && list.highlightedItem == list.footerItem)
+                return list.headerItem;
+
+            return list.collection.next();
+        }
+
+        /** Returns the previous item.
+        * @returns {pca.Item} The previous item. */
+        list.previousItem = function () {
+            if (!list.highlightedItem) return list.lastItem;
+
+            if (list.highlightedItem == list.collection.firstVisibleItem && (list.footerItem || list.headerItem))
+                return list.headerItem || list.footerItem;
+
+            if (list.footerItem && list.headerItem && list.highlightedItem == list.headerItem)
+                return list.footerItem;
+
+            return list.collection.previous();
         }
 
         /** Returns the current item.
         * @returns {pca.Item} The current item. */
-        list.currentItem = function () {
-            return list.collection.items[list.collection.highlighted];
+        list.currentItem = function() {
+            return list.highlightedItem;
         }
 
         /** Returns true if the current item is selectable.
@@ -1134,6 +1186,7 @@
             var current = list.collection.count;
 
             list.collection.filter(term);
+            list.markItems();
 
             if (current != list.collection.count)
                 list.fire("filter", term);
@@ -1141,8 +1194,81 @@
             return list;
         }
 
+        /** Calculates the height of the based on minItems, maxItems and item size.
+        * @returns {number} The height required in pixels. */
+        list.getHeight = function () {
+            var visibleItems = list.collection.visibleItems(),
+                headerItemHeight = list.headerItem ? pca.getSize(list.headerItem.element).height : 0,
+                footerItemHeight = list.footerItem ? pca.getSize(list.footerItem.element).height : 0,
+                lastItemHeight = 0,
+                itemsHeight = 0;
+
+            //count the height of items in the list
+            for (var i = 0; i < visibleItems.length && i < list.options.maxItems; i++) {
+                lastItemHeight = pca.getSize(visibleItems[i].element).height;
+                itemsHeight += lastItemHeight;
+            }
+
+            //calculate the height of blank space required to keep the list height - assumes the last item has no bottom border
+            if (visibleItems.length < list.options.minItems)
+                itemsHeight += (lastItemHeight + 1) * (list.options.minItems - visibleItems.length);
+
+            return itemsHeight + headerItemHeight + footerItemHeight;
+        }
+
+        /** Sizes the list based upon the maximum number of items. */
+        list.resize = function() {
+            var height = list.getHeight();
+
+            if (height > 0)
+                list.element.style.height = height + "px";
+        }
+
+        //Create an item for the list which is not in the main collection
+        function createListItem(data, format, callback) {
+            var item = new pca.Item(data, format);
+
+            item.listen("mouseover", function () {
+                list.collection.highlight(item);
+                item.highlight();
+            });
+
+            list.collection.listen("highlight", item.lowlight);
+
+            item.listen("select", function (selectedItem) {
+                list.collection.fire("select", selectedItem);
+                callback(selectedItem);
+            });
+
+            return item;
+        }
+
+        /** Adds an item to the list which will always appear at the bottom. */
+        list.setHeaderItem = function (data, format, callback) {
+            list.headerItem = createListItem(data, format, callback);
+            pca.addClass(list.footerItem.element, "pcaheaderitem");
+            list.markItems();
+            return list;
+        }
+
+        /** Adds an item to the list which will always appear at the bottom. */
+        list.setFooterItem = function (data, format, callback) {
+            list.footerItem = createListItem(data, format, callback);
+            pca.addClass(list.footerItem.element, "pcafooteritem");
+            list.markItems();
+            return list;
+        }
+
+        //store the current highlighted item
+        list.collection.listen("highlight", function(item) {
+            list.highlightedItem = item;
+        });
+
         //Map collection events
-        list.collection.listen("add", function (additions) { list.fire("add", additions) });
+        list.collection.listen("add", function (additions) {
+            list.markItems();
+            list.fire("add", additions);
+        });
 
         //ARIA support
         if (list.options.name) {
@@ -1150,19 +1276,19 @@
 
             list.collection.listen("add", function (additions) {
                 function listenHighlightChange(item) {
-                    item.listen("highlight", function () {
+                    item.listen("highlight", function() {
                         pca.setAttributes(list.element, { "aria-activedescendant": item.id });
                     });
                 }
 
-                for (var i = 0; i < additions.length; i++)
+                for (var i = 0; i < additions.length; i++) 
                     listenHighlightChange(additions[i]);
 
-                list.collection.all(function (item, index) {
+                list.collection.all(function(item, index) {
                     item.element.id = item.id = list.options.name + "_item" + index;
                     pca.setAttributes(item.element, { role: "option" });
                 });
-            });
+            });            
         }
 
         return list;
@@ -1218,6 +1344,8 @@
         /** When enabled list will not redraw as the user types, but filter events will still be raised. 
         * @type {boolean} */
         autocomplete.skipFilter = false;
+        /** Won't show the list, but it will continue to fire events in the same way. */
+        autocomplete.stealth = false;
 
         /** Header element. */
         autocomplete.header = {
@@ -1359,8 +1487,11 @@
                     bindFieldEvent(f, "focus", focus);
                     bindFieldEvent(f, "blur", autocomplete.blur);
                     bindFieldEvent(f, "keypress", autocomplete.keypress);
+                    bindFieldEvent(f, "paste", autocomplete.paste);
 
-                    if (f == document.activeElement) focus();
+                    // ReSharper disable once ConditionIsAlwaysConst
+                    // IE9 bug when running within iframe
+                    if (typeof document.activeElement != "unknown" && f == document.activeElement) focus();
                 }
 
                 bindFieldEvent(f, "click", function () { autocomplete.click(f); });
@@ -1384,8 +1515,11 @@
                     bindFieldEvent(f, "focus", focus);
                     bindFieldEvent(f, "blur", autocomplete.blur);
                     bindFieldEvent(f, "keypress", autocomplete.keypress);
+                    bindFieldEvent(f, "paste", autocomplete.paste);
 
-                    if (f == document.activeElement) focus();
+                    // ReSharper disable once ConditionIsAlwaysConst
+                    // IE9 bug when running within iframe
+                    if (typeof document.activeElement != "unknown" && f == document.activeElement) focus();
                 }
 
                 bindFieldEvent(f, "click", function () { autocomplete.click(f); });
@@ -1427,14 +1561,14 @@
                 }
             }
 
+            if (autocomplete.options.left) autocomplete.element.style.left = (parseInt(autocomplete.element.style.left) + parseInt(autocomplete.options.left)) + "px";
+            if (autocomplete.options.top) autocomplete.element.style.top = (parseInt(autocomplete.element.style.top) + parseInt(autocomplete.options.top)) + "px";
+
             //set minimum width for field
             if (!autocomplete.fixedWidth) {
                 var ownBorderWidth = (parseInt(pca.getStyle(autocomplete.element, "borderLeftWidth")) + parseInt(pca.getStyle(autocomplete.element, "borderRightWidth"))) || 0;
                 autocomplete.element.style.minWidth = Math.max((pca.getSize(field).width - ownBorderWidth), 0) + "px";
             }
-
-            if (autocomplete.options.left) autocomplete.element.style.left = (parseInt(autocomplete.element.style.left) + parseInt(autocomplete.options.left)) + "px";
-            if (autocomplete.options.top) autocomplete.element.style.top = (parseInt(autocomplete.element.style.top) + parseInt(autocomplete.options.top)) + "px";
 
             autocomplete.positionField = field;
             autocomplete.fire("move");
@@ -1467,8 +1601,10 @@
 
                 pca.setValue(autocomplete.field, text);
 
-                if (autocomplete.field.setSelectionRange)
-                    autocomplete.field.setSelectionRange(position, position);
+                if (autocomplete.field.setSelectionRange) {
+                    autocomplete.field.focus();
+                    autocomplete.field.setSelectionRange(position, position);                    
+                }
                 else if (autocomplete.field.createTextRange) {
                     var range = autocomplete.field.createTextRange();
                     range.move('character', position);
@@ -1484,7 +1620,7 @@
         /** Shows the autocomplete. 
         * @fires show */
         autocomplete.show = function () {
-            if (!autocomplete.disabled) {
+            if (!autocomplete.disabled && !autocomplete.stealth) {
                 autocomplete.visible = true;
                 autocomplete.element.style.display = "";
 
@@ -1569,7 +1705,7 @@
                 autocomplete.filter();
                 autocomplete.fire("delete");
             }
-            else if (key != 0 && key <= 46) { //recognised non-character key
+            else if (key != 0 && key <= 46 && key != 32) { //recognised non-character key
                 if (autocomplete.visible && autocomplete.list.navigate(key)) {
                     //todo: handle control + key combinations
                     if (event) pca.smash(event); //keys handled by the list, stop other events
@@ -1607,6 +1743,14 @@
                 pca.smash(event);
         }
 
+        //paste event handler
+        autocomplete.paste = function () {
+            window.setTimeout(function() {
+                autocomplete.filter();
+                autocomplete.fire("paste");
+            }, 0);
+        }
+
         /** Handles user clicks on field. 
         * @fires click */
         autocomplete.click = function (f) {
@@ -1627,7 +1771,7 @@
 
         /** Handles page resize.
         * @fires change */
-        autocomplete.resize = function () {
+        autocomplete.resize = function() {
             if (autocomplete.visible) autocomplete.reposition();
         }
 
@@ -1914,6 +2058,8 @@
         modal.addButton = function (labelText, callback, floatRight) {
             var button = pca.create("input", { type: "button", value: labelText, className: "pcabutton" });
 
+            callback = callback || function() {};
+
             //call the callback function with the form details
             function click() {
                 var details = {};
@@ -1925,7 +2071,7 @@
             }
 
             if (floatRight && !(document.documentMode && document.documentMode <= 7))
-                button.style.float = "right";
+                button.style.cssFloat = "right";
 
             pca.listen(button, "click", click);
             modal.footer.setContent(button);
@@ -1963,6 +2109,21 @@
             modal.element.style.display = "none";
             modal.mask.style.display = "none";
             modal.fire("hide");
+
+            return modal;
+        }
+
+        /** Clears the content and buttons of the modal window.
+        * @fires clear */
+        modal.clear = function() {
+            while (modal.content.childNodes.length)
+                modal.content.removeChild(modal.content.childNodes[0]);
+
+            while (modal.footer.element.childNodes.length)
+                modal.footer.element.removeChild(modal.footer.element.childNodes[0]);
+
+            modal.form = [];
+            modal.fire("clear");
 
             return modal;
         }
@@ -2069,17 +2230,18 @@
     * @example pca.formatLine({"line1": "Line One", "line2": "Line Two"}, "{line1}{, {line2}}");
     * @returns "Line One, Line Two" */
     pca.formatLine = function (item, format) {
-        function property(c) {
-            return (typeof item[c] == 'function' ? item[c]() : item[c]) || "";
+        function property(c, t) {
+            var val = (typeof item[c] == 'function' ? item[c]() : item[c]) || "";
+            return t === '!' ? val.toUpperCase() : val;
         }
 
         //replace properties with conditional formatting e.g. hello{ {name}!}
-        format = format.replace(/\{([^\}]*\{(\w+)\}[^\}]*)\}/g, function (m, f, c) {
-            var val = property(c);
-            return val ? f.replace(/\{(\w+)\}/g, val) : "";
+        format = format.replace(/\{([^\}]*\{(\w+)([^\}\w])?\}[^\}]*)\}/g, function (m, f, c, t) {
+            var val = property(c, t);
+            return val ? f.replace(/\{(\w+)([^\}\w])?\}/g, val) : "";
         });
 
-        return format.replace(/\{(\w+)\}/g, function (m, c) { return property(c); });
+        return format.replace(/\{(\w+)([^\}\w])?\}/g, function (m, c, t) { return property(c, t); });
     }
 
     /** Formats a line into a simplified tag for filtering. 
@@ -2305,12 +2467,22 @@
             if (element.tagName == "INPUT" || element.tagName == "TEXTAREA") {
                 if (element.type == "checkbox")
                     return element.checked;
+                else if (element.type == "radio") {
+                    var group = document.getElementsByName(element.name);
+                    for (var r = 0; r < group.length; r++) {
+                        if (group[r].checked)
+                            return group[r].value;
+                    }
+                }
                 else
                     return element.value;
             }
-            if (element.tagName == "SELECT")
-                return element.selectedIndex >= 0 ? element.options[element.selectedIndex].value : "";
-            if (element.tagName == "DIV" || element.tagName == "SPAN" || element.tagName == "TD")
+            if (element.tagName == "SELECT") {
+                if (element.selectedIndex < 0) return "";
+                var selectedOption = element.options[element.selectedIndex];
+                return selectedOption.value || selectedOption.text || "";
+            }
+            if (element.tagName == "DIV" || element.tagName == "SPAN" || element.tagName == "TD" || element.tagName == "LABEL")
                 return element.innerHTML;
         }
 
@@ -2324,26 +2496,35 @@
     pca.setValue = function (element, value) {
         if ((value || value == '') && (element = pca.getElement(element))) {
             var valueText = value.toString(),
-                valueTextLower = valueText.toLowerCase();
+                valueTextMatch = pca.formatTag(valueText);
 
             if (element.tagName == "INPUT") {
                 if (element.type == "checkbox")
-                    element.checked = ((typeof (value) == "boolean" && value) || valueTextLower == "true");
+                    element.checked = ((typeof (value) == "boolean" && value) || valueTextMatch == "TRUE");
+                else if (element.type == "radio") {
+                    var group = document.getElementsByName(element.name);
+                    for (var r = 0; r < group.length; r++) {
+                        if (pca.formatTag(group[r].value) == valueTextMatch) {
+                            group[r].checked = true;
+                            return;
+                        } 
+                    }
+                }
                 else
-                    element.value = pca.tidy(valueText.replace(/\n/g, ", "), ", ");
+                    element.value = pca.tidy(valueText.replace(/\\n|\n/gi, ", "), ", ");
             }
             else if (element.tagName == "TEXTAREA")
                 element.value = valueText;
             else if (element.tagName == "SELECT") {
                 for (var s = 0; s < element.options.length; s++) {
-                    if (element.options[s].value.toLowerCase() == valueTextLower || element.options[s].text.toLowerCase() == valueTextLower) {
+                    if (pca.formatTag(element.options[s].value) == valueTextMatch || pca.formatTag(element.options[s].text) == valueTextMatch) {
                         element.selectedIndex = s;
                         return;
                     }
                 }
             }
-            else if (element.tagName == "DIV" || element.tagName == "SPAN" || element.tagName == "TD")
-                element.innerHTML = valueText.replace(/\n/g, "<br/>");
+            else if (element.tagName == "DIV" || element.tagName == "SPAN" || element.tagName == "TD" || element.tagName == "LABEL")
+                element.innerHTML = valueText.replace(/\\n|\n/gi, "<br/>");
         }
     }
 
@@ -2367,6 +2548,17 @@
             return (element.tagName && element.tagName == "SELECT");
 
         return false;
+    }
+
+    /** Returns the current selected item of a select list field.
+    * @memberof pca 
+    * @param {string|HTMLElement} element - The element to check. 
+    * @returns {HTMLOptionElement} The current selected item. */
+    pca.getSelectedItem = function(element) {
+        if ((element = pca.getElement(element)) && element.tagName == "SELECT" && element.selectedIndex >= 0)
+            return element.options[element.selectedIndex];
+
+        return null;
     }
 
     /** Returns true if the element is a checkbox. 
@@ -2515,13 +2707,25 @@
             element.className = pca.removeWord(element.className, className);
     }
 
+    /** Sets an attribute of an element. 
+    * @memberof pca
+    * @param {HTMLElement|string} element - The element to set the attribute of.
+    * @param {string} attribute - The element attribute to set. 
+    * @param {Object} attribute - The value to set. */
+    pca.setAttribute = function (element, attribute, value) {
+        if (element = pca.getElement(element))
+            element.setAttribute(attribute, value);
+    }
+
     /** Sets multiple attributes of an element. 
     * @memberof pca
-    * @param {HTMLElement} element - The element to remove from the container.
+    * @param {HTMLElement|string} element - The element to set the attributes of.
     * @param {Object} attributes - The element attributes and values to set. */
     pca.setAttributes = function (element, attributes) {
-        for (var i in attributes)
-            element.setAttribute(i, attributes[i]);
+        if (element = pca.getElement(element)) {
+            for (var i in attributes)
+                element.setAttribute(i, attributes[i]);            
+        }
     }
 
     /** Applies fixes to a style sheet. 
@@ -2683,256 +2887,255 @@
     * @memberof pca 
     * @type {Array.<pca.Country>} */
     pca.countries = [
-        { iso2: "AF", iso3: "AFG", name: "Afghanistan", flag: 1 },
-        { iso2: "AX", iso3: "ALA", name: "�land Islands", flag: 220 },
-        { iso2: "AL", iso3: "ALB", name: "Albania", flag: 2 },
-        { iso2: "DZ", iso3: "DZA", name: "Algeria", flag: 3 },
-        { iso2: "AS", iso3: "ASM", name: "American Samoa", flag: 4 },
-        { iso2: "AD", iso3: "AND", name: "Andorra", flag: 5 },
-        { iso2: "AO", iso3: "AGO", name: "Angola", flag: 6 },
-        { iso2: "AI", iso3: "AIA", name: "Anguilla", flag: 7 },
-        { iso2: "AQ", iso3: "ATA", name: "Antarctica", flag: 0 },
-        { iso2: "AG", iso3: "ATG", name: "Antigua and Barbuda", flag: 8 },
-        { iso2: "AR", iso3: "ARG", name: "Argentina", flag: 9 },
-        { iso2: "AM", iso3: "ARM", name: "Armenia", flag: 10 },
-        { iso2: "AW", iso3: "ABW", name: "Aruba", flag: 11 },
-        { iso2: "AU", iso3: "AUS", name: "Australia", flag: 12 },
-        { iso2: "AT", iso3: "AUT", name: "Austria", flag: 13 },
-        { iso2: "AZ", iso3: "AZE", name: "Azerbaijan", flag: 14 },
-        { iso2: "BS", iso3: "BHS", name: "Bahamas", flag: 15 },
-        { iso2: "BH", iso3: "BHR", name: "Bahrain", flag: 16 },
-        { iso2: "BD", iso3: "BGD", name: "Bangladesh", flag: 17 },
-        { iso2: "BB", iso3: "BRB", name: "Barbados", flag: 18 },
-        { iso2: "BY", iso3: "BLR", name: "Belarus", flag: 19 },
-        { iso2: "BE", iso3: "BEL", name: "Belgium", flag: 20 },
-        { iso2: "BZ", iso3: "BLZ", name: "Belize", flag: 21 },
-        { iso2: "BJ", iso3: "BEN", name: "Benin", flag: 22 },
-        { iso2: "BM", iso3: "BMU", name: "Bermuda", flag: 23 },
-        { iso2: "BT", iso3: "BTN", name: "Bhutan", flag: 24 },
-        { iso2: "BO", iso3: "BOL", name: "Bolivia, Plurinational State Of", flag: 25 },
-        { iso2: "BQ", iso3: "BES", name: "Bonaire, Saint Eustatius and Saba", flag: 0 },
-        { iso2: "BA", iso3: "BIH", name: "Bosnia and Herzegovina", flag: 26 },
-        { iso2: "BW", iso3: "BWA", name: "Botswana", flag: 27 },
-        { iso2: "BV", iso3: "BVT", name: "Bouvet Island", flag: 0 },
-        { iso2: "BR", iso3: "BRA", name: "Brazil", flag: 28 },
-        { iso2: "IO", iso3: "IOT", name: "British Indian Ocean Territory", flag: 29 },
-        { iso2: "BN", iso3: "BRN", name: "Brunei Darussalam", flag: 0 },
-        { iso2: "BG", iso3: "BGR", name: "Bulgaria", flag: 31 },
-        { iso2: "BF", iso3: "BFA", name: "Burkina Faso", flag: 32 },
-        { iso2: "BI", iso3: "BDI", name: "Burundi", flag: 34 },
-        { iso2: "KH", iso3: "KHM", name: "Cambodia", flag: 35 },
-        { iso2: "CM", iso3: "CMR", name: "Cameroon", flag: 36 },
-        { iso2: "CA", iso3: "CAN", name: "Canada", flag: 37 },
-        { iso2: "CV", iso3: "CPV", name: "Cape Verde", flag: 38 },
-        { iso2: "KY", iso3: "CYM", name: "Cayman Islands", flag: 39 },
-        { iso2: "CF", iso3: "CAF", name: "Central African Republic", flag: 40 },
-        { iso2: "TD", iso3: "TCD", name: "Chad", flag: 41 },
-        { iso2: "CL", iso3: "CHL", name: "Chile", flag: 42 },
-        { iso2: "CN", iso3: "CHN", name: "China", flag: 43 },
-        { iso2: "CX", iso3: "CXR", name: "Christmas Island", flag: 0 },
-        { iso2: "CC", iso3: "CCK", name: "Cocos (Keeling) Islands", flag: 0 },
-        { iso2: "CO", iso3: "COL", name: "Colombia", flag: 44 },
-        { iso2: "KM", iso3: "COM", name: "Comoros", flag: 45 },
-        { iso2: "CG", iso3: "COG", name: "Congo", flag: 0 },
-        { iso2: "CD", iso3: "COD", name: "Congo, the Democratic Republic of the", flag: 46 },
-        { iso2: "CK", iso3: "COK", name: "Cook Islands", flag: 47 },
-        { iso2: "CR", iso3: "CRI", name: "Costa Rica", flag: 48 },
-        { iso2: "CI", iso3: "CIV", name: "C�te D'ivoire", flag: 49 },
-        { iso2: "HR", iso3: "HRV", name: "Croatia", flag: 50 },
-        { iso2: "CU", iso3: "CUB", name: "Cuba", flag: 51 },
-        { iso2: "CW", iso3: "CUW", name: "Cura�ao", flag: 0 },
-        { iso2: "CY", iso3: "CYP", name: "Cyprus", flag: 52 },
-        { iso2: "CZ", iso3: "CZE", name: "Czech Republic", flag: 53 },
-        { iso2: "DK", iso3: "DNK", name: "Denmark", flag: 54 },
-        { iso2: "DJ", iso3: "DJI", name: "Djibouti", flag: 55 },
-        { iso2: "DM", iso3: "DMA", name: "Dominica", flag: 56 },
-        { iso2: "DO", iso3: "DOM", name: "Dominican Republic", flag: 57 },
-        { iso2: "EC", iso3: "ECU", name: "Ecuador", flag: 61 },
-        { iso2: "EG", iso3: "EGY", name: "Egypt", flag: 58 },
-        { iso2: "SV", iso3: "SLV", name: "El Salvador", flag: 59 },
-        { iso2: "GQ", iso3: "GNQ", name: "Equatorial Guinea", flag: 62 },
-        { iso2: "ER", iso3: "ERI", name: "Eritrea", flag: 63 },
-        { iso2: "EE", iso3: "EST", name: "Estonia", flag: 64 },
-        { iso2: "ET", iso3: "ETH", name: "Ethiopia", flag: 65 },
-        { iso2: "FK", iso3: "FLK", name: "Falkland Islands (Malvinas)", flag: 66 },
-        { iso2: "FO", iso3: "FRO", name: "Faroe Islands", flag: 67 },
-        { iso2: "FJ", iso3: "FJI", name: "Fiji", flag: 68 },
-        { iso2: "FI", iso3: "FIN", name: "Finland", flag: 69 },
-        { iso2: "FR", iso3: "FRA", name: "France", flag: 70 },
-        { iso2: "GF", iso3: "GUF", name: "French Guiana", flag: 0 },
-        { iso2: "PF", iso3: "PYF", name: "French Polynesia", flag: 71 },
-        { iso2: "TF", iso3: "ATF", name: "French Southern Territories", flag: 0 },
-        { iso2: "GA", iso3: "GAB", name: "Gabon", flag: 72 },
-        { iso2: "GM", iso3: "GMB", name: "Gambia", flag: 73 },
-        { iso2: "GE", iso3: "GEO", name: "Georgia", flag: 74 },
-        { iso2: "DE", iso3: "DEU", name: "Germany", flag: 75 },
-        { iso2: "GH", iso3: "GHA", name: "Ghana", flag: 76 },
-        { iso2: "GI", iso3: "GIB", name: "Gibraltar", flag: 77 },
-        { iso2: "GR", iso3: "GRC", name: "Greece", flag: 79 },
-        { iso2: "GL", iso3: "GRL", name: "Greenland", flag: 80 },
-        { iso2: "GD", iso3: "GRD", name: "Grenada", flag: 81 },
-        { iso2: "GP", iso3: "GLP", name: "Guadeloupe", flag: 0 },
-        { iso2: "GU", iso3: "GUM", name: "Guam", flag: 82 },
-        { iso2: "GT", iso3: "GTM", name: "Guatemala", flag: 83 },
-        { iso2: "GG", iso3: "GGY", name: "Guernsey", flag: 84 },
-        { iso2: "GN", iso3: "GIN", name: "Guinea", flag: 85 },
-        { iso2: "GW", iso3: "GNB", name: "Guinea-Bissau", flag: 86 },
-        { iso2: "GY", iso3: "GUY", name: "Guyana", flag: 87 },
-        { iso2: "HT", iso3: "HTI", name: "Haiti", flag: 88 },
-        { iso2: "HM", iso3: "HMD", name: "Heard Island and McDonald Islands", flag: 0 },
-        { iso2: "VA", iso3: "VAT", name: "Holy See (Vatican City State)", flag: 0 },
-        { iso2: "HN", iso3: "HND", name: "Honduras", flag: 89 },
-        { iso2: "HK", iso3: "HKG", name: "Hong Kong", flag: 90 },
-        { iso2: "HU", iso3: "HUN", name: "Hungary", flag: 91 },
-        { iso2: "IS", iso3: "ISL", name: "Iceland", flag: 92 },
-        { iso2: "IN", iso3: "IND", name: "India", flag: 93 },
-        { iso2: "ID", iso3: "IDN", name: "Indonesia", flag: 94 },
-        { iso2: "IR", iso3: "IRN", name: "Iran, Islamic Republic Of", flag: 95 },
-        { iso2: "IQ", iso3: "IRQ", name: "Iraq", flag: 96 },
-        { iso2: "IE", iso3: "IRL", name: "Ireland", flag: 97 },
-        { iso2: "IM", iso3: "IMN", name: "Isle of Man", flag: 98 },
-        { iso2: "IL", iso3: "ISR", name: "Israel", flag: 99 },
-        { iso2: "IT", iso3: "ITA", name: "Italy", flag: 100 },
-        { iso2: "JM", iso3: "JAM", name: "Jamaica", flag: 101 },
-        { iso2: "JP", iso3: "JPN", name: "Japan", flag: 102 },
-        { iso2: "JE", iso3: "JEY", name: "Jersey", flag: 103 },
-        { iso2: "JO", iso3: "JOR", name: "Jordan", flag: 104 },
-        { iso2: "KZ", iso3: "KAZ", name: "Kazakhstan", flag: 105 },
-        { iso2: "KE", iso3: "KEN", name: "Kenya", flag: 106 },
-        { iso2: "KI", iso3: "KIR", name: "Kiribati", flag: 107 },
-        { iso2: "KP", iso3: "PRK", name: "Korea, Democratic People's Republic of", flag: 149 },
-        { iso2: "KR", iso3: "KOR", name: "Korea, Republic of", flag: 185 },
-        { iso2: "XK", iso3: "XKX", name: "Kosovo", flag: 0 },
-        { iso2: "KW", iso3: "KWT", name: "Kuwait", flag: 108 },
-        { iso2: "KG", iso3: "KGZ", name: "Kyrgyzstan", flag: 109 },
-        { iso2: "LA", iso3: "LAO", name: "Lao people's Democratic Republic", flag: 0 },
-        { iso2: "LV", iso3: "LVA", name: "Latvia", flag: 110 },
-        { iso2: "LB", iso3: "LBN", name: "Lebanon", flag: 111 },
-        { iso2: "LS", iso3: "LSO", name: "Lesotho", flag: 112 },
-        { iso2: "LR", iso3: "LBR", name: "Liberia", flag: 113 },
-        { iso2: "LY", iso3: "LBY", name: "Libya", flag: 114 },
-        { iso2: "LI", iso3: "LIE", name: "Liechtenstein", flag: 115 },
-        { iso2: "LT", iso3: "LTU", name: "Lithuania", flag: 116 },
-        { iso2: "LU", iso3: "LUX", name: "Luxembourg", flag: 117 },
-        { iso2: "MO", iso3: "MAC", name: "Macao", flag: 118 },
-        { iso2: "MK", iso3: "MKD", name: "Macedonia, the Former Yugoslav Republic of", flag: 119 },
-        { iso2: "MG", iso3: "MDG", name: "Madagascar", flag: 120 },
-        { iso2: "MW", iso3: "MWI", name: "Malawi", flag: 121 },
-        { iso2: "MY", iso3: "MYS", name: "Malaysia", flag: 122 },
-        { iso2: "MV", iso3: "MDV", name: "Maldives", flag: 123 },
-        { iso2: "ML", iso3: "MLI", name: "Mali", flag: 124 },
-        { iso2: "MT", iso3: "MLT", name: "Malta", flag: 125 },
-        { iso2: "MH", iso3: "MHL", name: "Marshall Islands", flag: 126 },
-        { iso2: "MQ", iso3: "MTQ", name: "Martinique", flag: 127 },
-        { iso2: "MR", iso3: "MRT", name: "Mauritania", flag: 128 },
-        { iso2: "MU", iso3: "MUS", name: "Mauritius", flag: 129 },
-        { iso2: "YT", iso3: "MYT", name: "Mayotte", flag: 0 },
-        { iso2: "MX", iso3: "MEX", name: "Mexico", flag: 130 },
-        { iso2: "FM", iso3: "FSM", name: "Micronesia, Federated States of", flag: 131 },
-        { iso2: "MD", iso3: "MDA", name: "Moldova, Republic of", flag: 132 },
-        { iso2: "MC", iso3: "MCO", name: "Monaco", flag: 133 },
-        { iso2: "MN", iso3: "MNG", name: "Mongolia", flag: 134 },
-        { iso2: "ME", iso3: "MNE", name: "Montenegro", flag: 0 },
-        { iso2: "MS", iso3: "MSR", name: "Montserrat", flag: 135 },
-        { iso2: "MA", iso3: "MAR", name: "Morocco", flag: 136 },
-        { iso2: "MZ", iso3: "MOZ", name: "Mozambique", flag: 137 },
-        { iso2: "MM", iso3: "MMR", name: "Myanmar", flag: 33 },
-        { iso2: "NA", iso3: "NAM", name: "Namibia", flag: 138 },
-        { iso2: "NR", iso3: "NRU", name: "Nauru", flag: 139 },
-        { iso2: "NP", iso3: "NPL", name: "Nepal", flag: 140 },
-        { iso2: "NL", iso3: "NLD", name: "Netherlands", flag: 141 },
-        { iso2: "NC", iso3: "NCL", name: "New Caledonia", flag: 0 },
-        { iso2: "NZ", iso3: "NZL", name: "New Zealand", flag: 142 },
-        { iso2: "NI", iso3: "NIC", name: "Nicaragua", flag: 143 },
-        { iso2: "NE", iso3: "NER", name: "Niger", flag: 144 },
-        { iso2: "NG", iso3: "NGA", name: "Nigeria", flag: 145 },
-        { iso2: "NU", iso3: "NIU", name: "Niue", flag: 146 },
-        { iso2: "NF", iso3: "NFK", name: "Norfolk Island", flag: 147 },
-        { iso2: "MP", iso3: "MNP", name: "Northern Mariana Islands", flag: 148 },
-        { iso2: "NO", iso3: "NOR", name: "Norway", flag: 150 },
-        { iso2: "OM", iso3: "OMN", name: "Oman", flag: 151 },
-        { iso2: "PK", iso3: "PAK", name: "Pakistan", flag: 152 },
-        { iso2: "PW", iso3: "PLW", name: "Palau", flag: 153 },
-        { iso2: "PS", iso3: "PSE", name: "Palestine, State of", flag: 0 },
-        { iso2: "PA", iso3: "PAN", name: "Panama", flag: 154 },
-        { iso2: "PG", iso3: "PNG", name: "Papua New Guinea", flag: 155 },
-        { iso2: "PY", iso3: "PRY", name: "Paraguay", flag: 156 },
-        { iso2: "PE", iso3: "PER", name: "Peru", flag: 157 },
-        { iso2: "PH", iso3: "PHL", name: "Philippines", flag: 158 },
-        { iso2: "PN", iso3: "PCN", name: "Pitcairn", flag: 0 },
-        { iso2: "PL", iso3: "POL", name: "Poland", flag: 159 },
-        { iso2: "PT", iso3: "PRT", name: "Portugal", flag: 160 },
-        { iso2: "PR", iso3: "PRI", name: "Puerto Rico", flag: 161 },
-        { iso2: "QA", iso3: "QAT", name: "Qatar", flag: 162 },
-        { iso2: "RE", iso3: "REU", name: "R�union", flag: 0 },
-        { iso2: "RO", iso3: "ROU", name: "Romania", flag: 163 },
-        { iso2: "RU", iso3: "RUS", name: "Russian Federation", flag: 164 },
-        { iso2: "RW", iso3: "RWA", name: "Rwanda", flag: 165 },
-        { iso2: "BL", iso3: "BLM", name: "Saint Barth�lemy", flag: 0 },
-        { iso2: "SH", iso3: "SHN", name: "Saint Helena, Ascension and Tristan da Cunha", flag: 166 },
-        { iso2: "KN", iso3: "KNA", name: "Saint Kitts and Nevis", flag: 167 },
-        { iso2: "LC", iso3: "LCA", name: "Saint Lucia", flag: 168 },
-        { iso2: "MF", iso3: "MAF", name: "Saint Martin (French part)", flag: 0 },
-        { iso2: "PM", iso3: "SPM", name: "Saint Pierre and Miquelon", flag: 169 },
-        { iso2: "VC", iso3: "VCT", name: "Saint Vincent and the Grenadines", flag: 170 },
-        { iso2: "WS", iso3: "WSM", name: "Samoa", flag: 171 },
-        { iso2: "SM", iso3: "SMR", name: "San Marino", flag: 172 },
-        { iso2: "ST", iso3: "STP", name: "Sao Tome and Principe", flag: 173 },
-        { iso2: "SA", iso3: "SAU", name: "Saudi Arabia", flag: 174 },
-        { iso2: "SN", iso3: "SEN", name: "Senegal", flag: 175 },
-        { iso2: "RS", iso3: "SRB", name: "Serbia", flag: 0 },
-        { iso2: "SC", iso3: "SYC", name: "Seychelles", flag: 176 },
-        { iso2: "SL", iso3: "SLE", name: "Sierra Leone", flag: 177 },
-        { iso2: "SG", iso3: "SGP", name: "Singapore", flag: 178 },
-        { iso2: "SX", iso3: "SXM", name: "Sint Maarten (Dutch part)", flag: 0 },
-        { iso2: "SK", iso3: "SVK", name: "Slovakia", flag: 179 },
-        { iso2: "SI", iso3: "SVN", name: "Slovenia", flag: 180 },
-        { iso2: "SB", iso3: "SLB", name: "Solomon Islands", flag: 181 },
-        { iso2: "SO", iso3: "SOM", name: "Somalia", flag: 182 },
-        { iso2: "ZA", iso3: "ZAF", name: "South Africa", flag: 183 },
-        { iso2: "GS", iso3: "SGS", name: "South Georgia and the South Sandwich Islands", flag: 184 },
-        { iso2: "SS", iso3: "SSD", name: "South Sudan", flag: 0 },
-        { iso2: "ES", iso3: "ESP", name: "Spain", flag: 186 },
-        { iso2: "LK", iso3: "LKA", name: "Sri Lanka", flag: 187 },
-        { iso2: "SD", iso3: "SDN", name: "Sudan", flag: 188 },
-        { iso2: "SR", iso3: "SUR", name: "Suriname", flag: 189 },
-        { iso2: "SJ", iso3: "SJM", name: "Svalbard and Jan Mayen", flag: 190 },
-        { iso2: "SZ", iso3: "SWZ", name: "Swaziland", flag: 191 },
-        { iso2: "SE", iso3: "SWE", name: "Sweden", flag: 192 },
-        { iso2: "CH", iso3: "CHE", name: "Switzerland", flag: 193 },
-        { iso2: "SY", iso3: "SYR", name: "Syrian Arab Republic", flag: 0 },
-        { iso2: "TW", iso3: "TWN", name: "Taiwan, Province Of China", flag: 194 },
-        { iso2: "TJ", iso3: "TJK", name: "Tajikistan", flag: 195 },
-        { iso2: "TZ", iso3: "TZA", name: "Tanzania, United Republic Of", flag: 196 },
-        { iso2: "TH", iso3: "THA", name: "Thailand", flag: 197 },
-        { iso2: "TL", iso3: "TLS", name: "Timor-Leste", flag: 0 },
-        { iso2: "TG", iso3: "TGO", name: "Togo", flag: 198 },
-        { iso2: "TK", iso3: "TKL", name: "Tokelau", flag: 0 },
-        { iso2: "TO", iso3: "TON", name: "Tonga", flag: 199 },
-        { iso2: "TT", iso3: "TTO", name: "Trinidad and Tobago", flag: 200 },
-        { iso2: "TN", iso3: "TUN", name: "Tunisia", flag: 201 },
-        { iso2: "TR", iso3: "TUR", name: "Turkey", flag: 202 },
-        { iso2: "TM", iso3: "TKM", name: "Turkmenistan", flag: 203 },
-        { iso2: "TC", iso3: "TCA", name: "Turks and Caicos Islands", flag: 204 },
-        { iso2: "TV", iso3: "TUV", name: "Tuvalu", flag: 205 },
-        { iso2: "UG", iso3: "UGA", name: "Uganda", flag: 206 },
-        { iso2: "UA", iso3: "UKR", name: "Ukraine", flag: 207 },
-        { iso2: "AE", iso3: "ARE", name: "United Arab Emirates", alternates: ["UAE"], flag: 208 },
-        { iso2: "GB", iso3: "GBR", name: "United Kingdom", alternates: ["Britain", "England", "Great Britain", "Northern Ireland", "Scotland", "UK", "Wales"], flag: 78 },
-        { iso2: "US", iso3: "USA", name: "United States", alternates: ["America", "United States of America"], flag: 210 },
-        { iso2: "UM", iso3: "UMI", name: "United States Minor Outlying Islands", flag: 0 },
-        { iso2: "UY", iso3: "URY", name: "Uruguay", flag: 209 },
-        { iso2: "UZ", iso3: "UZB", name: "Uzbekistan", flag: 211 },
-        { iso2: "VU", iso3: "VUT", name: "Vanuatu", flag: 212 },
-        { iso2: "VE", iso3: "VEN", name: "Venezuela, Bolivarian Republic Of", flag: 213 },
-        { iso2: "VN", iso3: "VNM", name: "Viet Nam", flag: 214 },
-        { iso2: "VG", iso3: "VGB", name: "Virgin Islands, British", flag: 30 },
-        { iso2: "VI", iso3: "VIR", name: "Virgin Islands, U.S.", flag: 215 },
-        { iso2: "WF", iso3: "WLF", name: "Wallis and Futuna", flag: 216 },
-        { iso2: "EH", iso3: "ESH", name: "Western Sahara", flag: 0 },
-        { iso2: "YE", iso3: "YEM", name: "Yemen", flag: 217 },
-        { iso2: "ZM", iso3: "ZMB", name: "Zambia", flag: 218 },
-        { iso2: "ZW", iso3: "ZWE", name: "Zimbabwe", flag: 219 }
+        { iso2: "AF", iso3: "AFG", name: "Afghanistan", name_fr: "Afghanistan", flag: 1 },
+        { iso2: "AX", iso3: "ALA", name: "Åland Islands", name_fr: "Åland, Îles", flag: 220 },
+        { iso2: "AL", iso3: "ALB", name: "Albania", name_fr: "Albanie", alternates: [ "Shqipëria" ], flag: 2 },
+        { iso2: "DZ", iso3: "DZA", name: "Algeria", name_fr: "Algérie", flag: 3 },
+        { iso2: "AS", iso3: "ASM", name: "American Samoa", name_fr: "Samoa Américaines", flag: 4 },
+        { iso2: "AD", iso3: "AND", name: "Andorra", name_fr: "Andorre", flag: 5 },
+        { iso2: "AO", iso3: "AGO", name: "Angola", name_fr: "Angola", flag: 6 },
+        { iso2: "AI", iso3: "AIA", name: "Anguilla", name_fr: "Anguilla", flag: 7 },
+        { iso2: "AQ", iso3: "ATA", name: "Antarctica", name_fr: "Antarctique", flag: 0 },
+        { iso2: "AG", iso3: "ATG", name: "Antigua and Barbuda", name_fr: "Antigua-et-Barbuda", flag: 8 },
+        { iso2: "AR", iso3: "ARG", name: "Argentina", name_fr: "Argentine", flag: 9 },
+        { iso2: "AM", iso3: "ARM", name: "Armenia", name_fr: "Arménie", flag: 10 },
+        { iso2: "AW", iso3: "ABW", name: "Aruba", name_fr: "Aruba", flag: 11 },
+        { iso2: "AU", iso3: "AUS", name: "Australia", name_fr: "Australie", flag: 12 },
+        { iso2: "AT", iso3: "AUT", name: "Austria", name_fr: "Autriche", alternates: [ "Österreich" ], flag: 13 },
+        { iso2: "AZ", iso3: "AZE", name: "Azerbaijan", name_fr: "Azerbaïdjan", flag: 14 },
+        { iso2: "BS", iso3: "BHS", name: "Bahamas", name_fr: "Bahamas", flag: 15 },
+        { iso2: "BH", iso3: "BHR", name: "Bahrain", name_fr: "Bahreïn", flag: 16 },
+        { iso2: "BD", iso3: "BGD", name: "Bangladesh", name_fr: "Bangladesh", flag: 17 },
+        { iso2: "BB", iso3: "BRB", name: "Barbados", name_fr: "Barbade", flag: 18 },
+        { iso2: "BY", iso3: "BLR", name: "Belarus", name_fr: "Bélarus", flag: 19 },
+        { iso2: "BE", iso3: "BEL", name: "Belgium", name_fr: "Belgique", alternates: [ "België" ], flag: 20 },
+        { iso2: "BZ", iso3: "BLZ", name: "Belize", name_fr: "Belize", flag: 21 },
+        { iso2: "BJ", iso3: "BEN", name: "Benin", name_fr: "Bénin", flag: 22 },
+        { iso2: "BM", iso3: "BMU", name: "Bermuda", name_fr: "Bermudes", flag: 23 },
+        { iso2: "BT", iso3: "BTN", name: "Bhutan", name_fr: "Bhoutan", flag: 24 },
+        { iso2: "BO", iso3: "BOL", name: "Bolivia, Plurinational State of", name_fr: "Bolivie, État Plurinational de", flag: 25 },
+        { iso2: "BQ", iso3: "BES", name: "Bonaire, Sint Eustatius and Saba", name_fr: "Bonaire, Saint-Eustache et Saba", flag: 0 },
+        { iso2: "BA", iso3: "BIH", name: "Bosnia and Herzegovina", name_fr: "Bosnie-Herzégovine", alternates: [ "Bosna i Hercegovina" ], flag: 26 },
+        { iso2: "BW", iso3: "BWA", name: "Botswana", name_fr: "Botswana", flag: 27 },
+        { iso2: "BV", iso3: "BVT", name: "Bouvet Island", name_fr: "Bouvet, Île", flag: 0 },
+        { iso2: "BR", iso3: "BRA", name: "Brazil", name_fr: "Brésil", alternates: [ "Brasil" ], flag: 28 },
+        { iso2: "IO", iso3: "IOT", name: "British Indian Ocean Territory", name_fr: "Océan Indien, Territoire Britannique de l'", flag: 29 },
+        { iso2: "BN", iso3: "BRN", name: "Brunei Darussalam", name_fr: "Brunei Darussalam", flag: 0 },
+        { iso2: "BG", iso3: "BGR", name: "Bulgaria", name_fr: "Bulgarie", flag: 31 },
+        { iso2: "BF", iso3: "BFA", name: "Burkina Faso", name_fr: "Burkina Faso (le)", flag: 32 },
+        { iso2: "BI", iso3: "BDI", name: "Burundi", name_fr: "Burundi", flag: 34 },
+        { iso2: "CV", iso3: "CPV", name: "Cabo Verde", name_fr: "Cap-Vert", flag: 38 },
+        { iso2: "KH", iso3: "KHM", name: "Cambodia", name_fr: "Cambodge", flag: 35 },
+        { iso2: "CM", iso3: "CMR", name: "Cameroon", name_fr: "Cameroun", flag: 36 },
+        { iso2: "CA", iso3: "CAN", name: "Canada", name_fr: "Canada", flag: 37 },
+        { iso2: "KY", iso3: "CYM", name: "Cayman Islands", name_fr: "Caïmans, Îles", flag: 39 },
+        { iso2: "CF", iso3: "CAF", name: "Central African Republic", name_fr: "Centrafricaine, République", flag: 40 },
+        { iso2: "TD", iso3: "TCD", name: "Chad", name_fr: "Tchad", flag: 41 },
+        { iso2: "CL", iso3: "CHL", name: "Chile", name_fr: "Chili", flag: 42 },
+        { iso2: "CN", iso3: "CHN", name: "China", name_fr: "Chine", flag: 43 },
+        { iso2: "CX", iso3: "CXR", name: "Christmas Island", name_fr: "Christmas, Île", flag: 0 },
+        { iso2: "CC", iso3: "CCK", name: "Cocos (Keeling) Islands", name_fr: "Cocos (Keeling), Îles", flag: 0 },
+        { iso2: "CO", iso3: "COL", name: "Colombia", name_fr: "Colombie", flag: 44 },
+        { iso2: "KM", iso3: "COM", name: "Comoros", name_fr: "Comores", flag: 45 },
+        { iso2: "CG", iso3: "COG", name: "Congo", name_fr: "Congo", flag: 0 },
+        { iso2: "CD", iso3: "COD", name: "Congo, Democratic Republic of the", name_fr: "Congo, République Démocratique du", flag: 46 },
+        { iso2: "CK", iso3: "COK", name: "Cook Islands", name_fr: "Cook, Îles", flag: 47 },
+        { iso2: "CR", iso3: "CRI", name: "Costa Rica", name_fr: "Costa Rica", flag: 48 },
+        { iso2: "CI", iso3: "CIV", name: "Côte d'Ivoire", name_fr: "Côte d'Ivoire", flag: 49 },
+        { iso2: "HR", iso3: "HRV", name: "Croatia", name_fr: "Croatie", alternates: [ "Hrvatska" ], flag: 50 },
+        { iso2: "CU", iso3: "CUB", name: "Cuba", name_fr: "Cuba", flag: 51 },
+        { iso2: "CW", iso3: "CUW", name: "Curaçao", name_fr: "Curaçao", flag: 0 },
+        { iso2: "CY", iso3: "CYP", name: "Cyprus", name_fr: "Chypre", flag: 52 },
+        { iso2: "CZ", iso3: "CZE", name: "Czech Republic", name_fr: "Tchèque, République", alternates: [ "Ceská republika" ], flag: 53 },
+        { iso2: "DK", iso3: "DNK", name: "Denmark", name_fr: "Danemark", flag: 54 },
+        { iso2: "DJ", iso3: "DJI", name: "Djibouti", name_fr: "Djibouti", flag: 55 },
+        { iso2: "DM", iso3: "DMA", name: "Dominica", name_fr: "Dominique", flag: 56 },
+        { iso2: "DO", iso3: "DOM", name: "Dominican Republic", name_fr: "Dominicaine, République", flag: 57 },
+        { iso2: "EC", iso3: "ECU", name: "Ecuador", name_fr: "Équateur", flag: 61 },
+        { iso2: "EG", iso3: "EGY", name: "Egypt", name_fr: "Égypte", flag: 58 },
+        { iso2: "SV", iso3: "SLV", name: "El Salvador", name_fr: "El Salvador", flag: 59 },
+        { iso2: "GQ", iso3: "GNQ", name: "Equatorial Guinea", name_fr: "Guinée Équatoriale", flag: 62 },
+        { iso2: "ER", iso3: "ERI", name: "Eritrea", name_fr: "Érythrée", flag: 63 },
+        { iso2: "EE", iso3: "EST", name: "Estonia", name_fr: "Estonie", alternates: [ "Eesti" ], flag: 64 },
+        { iso2: "ET", iso3: "ETH", name: "Ethiopia", name_fr: "Éthiopie", flag: 65 },
+        { iso2: "FK", iso3: "FLK", name: "Falkland Islands (Malvinas)", name_fr: "Falkland, Îles (Malvinas)", flag: 66 },
+        { iso2: "FO", iso3: "FRO", name: "Faroe Islands", name_fr: "Féroé, Îles", flag: 67 },
+        { iso2: "FJ", iso3: "FJI", name: "Fiji", name_fr: "Fidji", flag: 68 },
+        { iso2: "FI", iso3: "FIN", name: "Finland", name_fr: "Finlande", alternates: [ "Suomi" ], flag: 69 },
+        { iso2: "FR", iso3: "FRA", name: "France", name_fr: "France", flag: 70 },
+        { iso2: "GF", iso3: "GUF", name: "French Guiana", name_fr: "Guyane Française", flag: 0 },
+        { iso2: "PF", iso3: "PYF", name: "French Polynesia", name_fr: "Polynésie Française", flag: 71 },
+        { iso2: "TF", iso3: "ATF", name: "French Southern Territories", name_fr: "Terres Australes Françaises", flag: 0 },
+        { iso2: "GA", iso3: "GAB", name: "Gabon", name_fr: "Gabon", flag: 72 },
+        { iso2: "GM", iso3: "GMB", name: "Gambia", name_fr: "Gambie", flag: 73 },
+        { iso2: "GE", iso3: "GEO", name: "Georgia", name_fr: "Géorgie", flag: 74 },
+        { iso2: "DE", iso3: "DEU", name: "Germany", name_fr: "Allemagne", alternates: [ "Deutschland" ], flag: 75 },
+        { iso2: "GH", iso3: "GHA", name: "Ghana", name_fr: "Ghana", flag: 76 },
+        { iso2: "GI", iso3: "GIB", name: "Gibraltar", name_fr: "Gibraltar", flag: 77 },
+        { iso2: "GR", iso3: "GRC", name: "Greece", name_fr: "Grèce", alternates: [ "Hellas" ], flag: 79 },
+        { iso2: "GL", iso3: "GRL", name: "Greenland", name_fr: "Groenland", flag: 80 },
+        { iso2: "GD", iso3: "GRD", name: "Grenada", name_fr: "Grenade", flag: 81 },
+        { iso2: "GP", iso3: "GLP", name: "Guadeloupe", name_fr: "Guadeloupe", flag: 0 },
+        { iso2: "GU", iso3: "GUM", name: "Guam", name_fr: "Guam", flag: 82 },
+        { iso2: "GT", iso3: "GTM", name: "Guatemala", name_fr: "Guatemala", flag: 83 },
+        { iso2: "GG", iso3: "GGY", name: "Guernsey", name_fr: "Guernesey", flag: 84 },
+        { iso2: "GN", iso3: "GIN", name: "Guinea", name_fr: "Guinée", flag: 85 },
+        { iso2: "GW", iso3: "GNB", name: "Guinea-Bissau", name_fr: "Guinée-Bissau", flag: 86 },
+        { iso2: "GY", iso3: "GUY", name: "Guyana", name_fr: "Guyana", flag: 87 },
+        { iso2: "HT", iso3: "HTI", name: "Haiti", name_fr: "Haïti", flag: 88 },
+        { iso2: "HM", iso3: "HMD", name: "Heard Island and McDonald Islands", name_fr: "Heard-et-Îles MacDonald, Île", flag: 0 },
+        { iso2: "VA", iso3: "VAT", name: "Holy See (Vatican City State)", name_fr: "Saint-Siège (État de la Cité du Vatican)", flag: 0 },
+        { iso2: "HN", iso3: "HND", name: "Honduras", name_fr: "Honduras", flag: 89 },
+        { iso2: "HK", iso3: "HKG", name: "Hong Kong", name_fr: "Hong Kong", flag: 90 },
+        { iso2: "HU", iso3: "HUN", name: "Hungary", name_fr: "Hongrie", alternates: [ "Magyarország" ], flag: 91 },
+        { iso2: "IS", iso3: "ISL", name: "Iceland", name_fr: "Islande", alternates: [ "Ísland" ], flag: 92 },
+        { iso2: "IN", iso3: "IND", name: "India", name_fr: "Inde", flag: 93 },
+        { iso2: "ID", iso3: "IDN", name: "Indonesia", name_fr: "Indonésie", flag: 94 },
+        { iso2: "IR", iso3: "IRN", name: "Iran, Islamic Republic of", name_fr: "Iran (République Islamique d')", flag: 95 },
+        { iso2: "IQ", iso3: "IRQ", name: "Iraq", name_fr: "Iraq", flag: 96 },
+        { iso2: "IE", iso3: "IRL", name: "Ireland", name_fr: "Irlande", flag: 97 },
+        { iso2: "IM", iso3: "IMN", name: "Isle of Man", name_fr: "Île De Man", flag: 98 },
+        { iso2: "IL", iso3: "ISR", name: "Israel", name_fr: "Israël", flag: 99 },
+        { iso2: "IT", iso3: "ITA", name: "Italy", name_fr: "Italie", alternates: [ "Italia" ], flag: 100 },
+        { iso2: "JM", iso3: "JAM", name: "Jamaica", name_fr: "Jamaïque", flag: 101 },
+        { iso2: "JP", iso3: "JPN", name: "Japan", name_fr: "Japon", flag: 102 },
+        { iso2: "JE", iso3: "JEY", name: "Jersey", name_fr: "Jersey", flag: 103 },
+        { iso2: "JO", iso3: "JOR", name: "Jordan", name_fr: "Jordanie", flag: 104 },
+        { iso2: "KZ", iso3: "KAZ", name: "Kazakhstan", name_fr: "Kazakhstan", flag: 105 },
+        { iso2: "KE", iso3: "KEN", name: "Kenya", name_fr: "Kenya", flag: 106 },
+        { iso2: "KI", iso3: "KIR", name: "Kiribati", name_fr: "Kiribati", flag: 107 },
+        { iso2: "KP", iso3: "PRK", name: "Korea, Democratic People's Republic of", name_fr: "Corée, République Populaire Démocratique de", flag: 149 },
+        { iso2: "KR", iso3: "KOR", name: "Korea, Republic of", name_fr: "Corée, République de", flag: 185 },
+        { iso2: "KW", iso3: "KWT", name: "Kuwait", name_fr: "Koweït", flag: 108 },
+        { iso2: "KG", iso3: "KGZ", name: "Kyrgyzstan", name_fr: "Kirghizistan", flag: 109 },
+        { iso2: "LA", iso3: "LAO", name: "Lao People's Democratic Republic", name_fr: "Lao, République Démocratique Populaire", flag: 0 },
+        { iso2: "LV", iso3: "LVA", name: "Latvia", name_fr: "Lettonie", flag: 110 },
+        { iso2: "LB", iso3: "LBN", name: "Lebanon", name_fr: "Liban", flag: 111 },
+        { iso2: "LS", iso3: "LSO", name: "Lesotho", name_fr: "Lesotho", flag: 112 },
+        { iso2: "LR", iso3: "LBR", name: "Liberia", name_fr: "Libéria", flag: 113 },
+        { iso2: "LY", iso3: "LBY", name: "Libya", name_fr: "Libye", flag: 114 },
+        { iso2: "LI", iso3: "LIE", name: "Liechtenstein", name_fr: "Liechtenstein", flag: 115 },
+        { iso2: "LT", iso3: "LTU", name: "Lithuania", name_fr: "Lituanie", alternates: [ "Lietuva" ], flag: 116 },
+        { iso2: "LU", iso3: "LUX", name: "Luxembourg", name_fr: "Luxembourg", flag: 117 },
+        { iso2: "MO", iso3: "MAC", name: "Macao", name_fr: "Macao", flag: 118 },
+        { iso2: "MK", iso3: "MKD", name: "Macedonia, the Former Yugoslav Republic of", name_fr: "Macédoine, l'ex-République Yougoslave de", alternates: [ "Poraneshna Jugoslovenska Republika Makedonija" ], flag: 119 },
+        { iso2: "MG", iso3: "MDG", name: "Madagascar", name_fr: "Madagascar", flag: 120 },
+        { iso2: "MW", iso3: "MWI", name: "Malawi", name_fr: "Malawi", flag: 121 },
+        { iso2: "MY", iso3: "MYS", name: "Malaysia", name_fr: "Malaisie", flag: 122 },
+        { iso2: "MV", iso3: "MDV", name: "Maldives", name_fr: "Maldives", flag: 123 },
+        { iso2: "ML", iso3: "MLI", name: "Mali", name_fr: "Mali", flag: 124 },
+        { iso2: "MT", iso3: "MLT", name: "Malta", name_fr: "Malte", flag: 125 },
+        { iso2: "MH", iso3: "MHL", name: "Marshall Islands", name_fr: "Marshall, Îles", flag: 126 },
+        { iso2: "MQ", iso3: "MTQ", name: "Martinique", name_fr: "Martinique", flag: 127 },
+        { iso2: "MR", iso3: "MRT", name: "Mauritania", name_fr: "Mauritanie", flag: 128 },
+        { iso2: "MU", iso3: "MUS", name: "Mauritius", name_fr: "Maurice", flag: 129 },
+        { iso2: "YT", iso3: "MYT", name: "Mayotte", name_fr: "Mayotte", flag: 0 },
+        { iso2: "MX", iso3: "MEX", name: "Mexico", name_fr: "Mexique", flag: 130 },
+        { iso2: "FM", iso3: "FSM", name: "Micronesia, Federated States of", name_fr: "Micronésie, États Fédérés de", flag: 131 },
+        { iso2: "MD", iso3: "MDA", name: "Moldova, Republic of", name_fr: "Moldova, République de", flag: 132 },
+        { iso2: "MC", iso3: "MCO", name: "Monaco", name_fr: "Monaco", flag: 133 },
+        { iso2: "MN", iso3: "MNG", name: "Mongolia", name_fr: "Mongolie", flag: 134 },
+        { iso2: "ME", iso3: "MNE", name: "Montenegro", name_fr: "Monténégro", alternates: [ "Crna Gora" ], flag: 0 },
+        { iso2: "MS", iso3: "MSR", name: "Montserrat", name_fr: "Montserrat", flag: 135 },
+        { iso2: "MA", iso3: "MAR", name: "Morocco", name_fr: "Maroc", flag: 136 },
+        { iso2: "MZ", iso3: "MOZ", name: "Mozambique", name_fr: "Mozambique", flag: 137 },
+        { iso2: "MM", iso3: "MMR", name: "Myanmar", name_fr: "Myanmar", flag: 33 },
+        { iso2: "NA", iso3: "NAM", name: "Namibia", name_fr: "Namibie", flag: 138 },
+        { iso2: "NR", iso3: "NRU", name: "Nauru", name_fr: "Nauru", flag: 139 },
+        { iso2: "NP", iso3: "NPL", name: "Nepal", name_fr: "Népal", flag: 140 },
+        { iso2: "NL", iso3: "NLD", name: "Netherlands", name_fr: "Pays-Bas", alternates: [ "Holland" ], flag: 141 },
+        { iso2: "NC", iso3: "NCL", name: "New Caledonia", name_fr: "Nouvelle-Calédonie", flag: 0 },
+        { iso2: "NZ", iso3: "NZL", name: "New Zealand", name_fr: "Nouvelle-Zélande", flag: 142 },
+        { iso2: "NI", iso3: "NIC", name: "Nicaragua", name_fr: "Nicaragua", flag: 143 },
+        { iso2: "NE", iso3: "NER", name: "Niger", name_fr: "Niger", flag: 144 },
+        { iso2: "NG", iso3: "NGA", name: "Nigeria", name_fr: "Nigéria", flag: 145 },
+        { iso2: "NU", iso3: "NIU", name: "Niue", name_fr: "Niue", flag: 146 },
+        { iso2: "NF", iso3: "NFK", name: "Norfolk Island", name_fr: "Norfolk, Île", flag: 147 },
+        { iso2: "MP", iso3: "MNP", name: "Northern Mariana Islands", name_fr: "Mariannes du Nord, Îles", flag: 148 },
+        { iso2: "NO", iso3: "NOR", name: "Norway", name_fr: "Norvège", flag: 150 },
+        { iso2: "OM", iso3: "OMN", name: "Oman", name_fr: "Oman", flag: 151 },
+        { iso2: "PK", iso3: "PAK", name: "Pakistan", name_fr: "Pakistan", flag: 152 },
+        { iso2: "PW", iso3: "PLW", name: "Palau", name_fr: "Palaos", flag: 153 },
+        { iso2: "PS", iso3: "PSE", name: "Palestine, State of", name_fr: "Palestine, État de", flag: 0 },
+        { iso2: "PA", iso3: "PAN", name: "Panama", name_fr: "Panama", flag: 154 },
+        { iso2: "PG", iso3: "PNG", name: "Papuaniugini", name_fr: "Papouasie-Nouvelle-Guinée", flag: 155 },
+        { iso2: "PY", iso3: "PRY", name: "Paraguay", name_fr: "Paraguay", flag: 156 },
+        { iso2: "PE", iso3: "PER", name: "Peru", name_fr: "Pérou", flag: 157 },
+        { iso2: "PH", iso3: "PHL", name: "Philippines", name_fr: "Philippines", flag: 158 },
+        { iso2: "PN", iso3: "PCN", name: "Pitcairn", name_fr: "Pitcairn", flag: 0 },
+        { iso2: "PL", iso3: "POL", name: "Poland", name_fr: "Pologne", alternates: [ "Polska" ], flag: 159 },
+        { iso2: "PT", iso3: "PRT", name: "Portugal", name_fr: "Portugal", flag: 160 },
+        { iso2: "PR", iso3: "PRI", name: "Puerto Rico", name_fr: "Porto Rico", flag: 161 },
+        { iso2: "QA", iso3: "QAT", name: "Qatar", name_fr: "Qatar", flag: 162 },
+        { iso2: "RE", iso3: "REU", name: "Réunion", name_fr: "Réunion", flag: 0 },
+        { iso2: "RO", iso3: "ROU", name: "Romania", name_fr: "Roumanie", alternates: [ "România" ], flag: 163 },
+        { iso2: "RU", iso3: "RUS", name: "Russian Federation", name_fr: "Russie, Fédération De", alternates: [ "Rossiya" ], flag: 164 },
+        { iso2: "RW", iso3: "RWA", name: "Rwanda", name_fr: "Rwanda", flag: 165 },
+        { iso2: "BL", iso3: "BLM", name: "Saint Barthélemy", name_fr: "Saint-Barthélemy", flag: 0 },
+        { iso2: "SH", iso3: "SHN", name: "Saint Helena, Ascension and Tristan Da Cunha", name_fr: "Sainte-Hélène, Ascension et Tristan da Cunha", flag: 166 },
+        { iso2: "KN", iso3: "KNA", name: "Saint Kitts and Nevis", name_fr: "Saint-Kitts-Et-Nevis", flag: 167 },
+        { iso2: "LC", iso3: "LCA", name: "Saint Lucia", name_fr: "Sainte-Lucie", flag: 168 },
+        { iso2: "MF", iso3: "MAF", name: "Saint Martin (French Part)", name_fr: "Saint-Martin (Partie Française)", flag: 0 },
+        { iso2: "PM", iso3: "SPM", name: "Saint Pierre and Miquelon", name_fr: "Saint-Pierre-Et-Miquelon", flag: 169 },
+        { iso2: "VC", iso3: "VCT", name: "Saint Vincent and the Grenadines", name_fr: "Saint-Vincent-et-les Grenadines", flag: 170 },
+        { iso2: "WS", iso3: "WSM", name: "Samoa", name_fr: "Samoa", flag: 171 },
+        { iso2: "SM", iso3: "SMR", name: "San Marino", name_fr: "Saint-Marin", flag: 172 },
+        { iso2: "ST", iso3: "STP", name: "Sao Tome and Principe", name_fr: "Sao Tomé-et-Principe", flag: 173 },
+        { iso2: "SA", iso3: "SAU", name: "Saudi Arabia", name_fr: "Arabie Saoudite", flag: 174 },
+        { iso2: "SN", iso3: "SEN", name: "Senegal", name_fr: "Sénégal", flag: 175 },
+        { iso2: "RS", iso3: "SRB", name: "Serbia", name_fr: "Serbie", alternates: [ "Srbija" ], flag: 0 },
+        { iso2: "SC", iso3: "SYC", name: "Seychelles", name_fr: "Seychelles", flag: 176 },
+        { iso2: "SL", iso3: "SLE", name: "Sierra Leone", name_fr: "Sierra Leone", flag: 177 },
+        { iso2: "SG", iso3: "SGP", name: "Singapore", name_fr: "Singapour", flag: 178 },
+        { iso2: "SX", iso3: "SXM", name: "Sint Maarten (Dutch Part)", name_fr: "Saint-Martin (Partie Néerlandaise)", flag: 0 },
+        { iso2: "SK", iso3: "SVK", name: "Slovakia", name_fr: "Slovaquie", alternates: [ "Slovenská republika" ], flag: 179 },
+        { iso2: "SI", iso3: "SVN", name: "Slovenia", name_fr: "Slovénie", alternates: [ "Slovenija" ], flag: 180 },
+        { iso2: "SB", iso3: "SLB", name: "Solomon Islands", name_fr: "Salomon, Îles", flag: 181 },
+        { iso2: "SO", iso3: "SOM", name: "Somalia", name_fr: "Somalie", flag: 182 },
+        { iso2: "ZA", iso3: "ZAF", name: "South Africa", name_fr: "Afrique du Sud", flag: 183 },
+        { iso2: "GS", iso3: "SGS", name: "South Georgia and the South Sandwich Islands", name_fr: "Géorgie du Sud-et-les Îles Sandwich du Sud", flag: 184 },
+        { iso2: "SS", iso3: "SSD", name: "South Sudan", name_fr: "Soudan du Sud", flag: 0 },
+        { iso2: "ES", iso3: "ESP", name: "Spain", name_fr: "Espagne", alternates: [ "España" ], flag: 186 },
+        { iso2: "LK", iso3: "LKA", name: "Sri Lanka", name_fr: "Sri Lanka", flag: 187 },
+        { iso2: "SD", iso3: "SDN", name: "Sudan", name_fr: "Soudan", flag: 188 },
+        { iso2: "SR", iso3: "SUR", name: "Suriname", name_fr: "Suriname", flag: 189 },
+        { iso2: "SJ", iso3: "SJM", name: "Svalbard and Jan Mayen", name_fr: "Svalbard et Île Jan Mayen", flag: 190 },
+        { iso2: "SZ", iso3: "SWZ", name: "Swaziland", name_fr: "Swaziland", flag: 191 },
+        { iso2: "SE", iso3: "SWE", name: "Sweden", name_fr: "Suède", alternates: [ "Sverige" ], flag: 192 },
+        { iso2: "CH", iso3: "CHE", name: "Switzerland", name_fr: "Suisse", alternates: [ "Schweiz" ], flag: 193 },
+        { iso2: "SY", iso3: "SYR", name: "Syrian Arab Republic", name_fr: "Syrienne, République Arabe", flag: 0 },
+        { iso2: "TW", iso3: "TWN", name: "Taiwan, Province of China", name_fr: "Taïwan, Province de Chine", flag: 194 },
+        { iso2: "TJ", iso3: "TJK", name: "Tajikistan", name_fr: "Tadjikistan", flag: 195 },
+        { iso2: "TZ", iso3: "TZA", name: "Tanzania, United Republic of", name_fr: "Tanzanie, République-Unie de", flag: 196 },
+        { iso2: "TH", iso3: "THA", name: "Thailand", name_fr: "Thaïlande", flag: 197 },
+        { iso2: "TL", iso3: "TLS", name: "Timor-Leste", name_fr: "Timor-Leste", flag: 0 },
+        { iso2: "TG", iso3: "TGO", name: "Togo", name_fr: "Togo", flag: 198 },
+        { iso2: "TK", iso3: "TKL", name: "Tokelau", name_fr: "Tokelau", flag: 0 },
+        { iso2: "TO", iso3: "TON", name: "Tonga", name_fr: "Tonga", flag: 199 },
+        { iso2: "TT", iso3: "TTO", name: "Trinidad and Tobago", name_fr: "Trinité-et-Tobago", flag: 200 },
+        { iso2: "TN", iso3: "TUN", name: "Tunisia", name_fr: "Tunisie", flag: 201 },
+        { iso2: "TR", iso3: "TUR", name: "Turkey", name_fr: "Turquie", alternates: [ "Türkiye" ], flag: 202 },
+        { iso2: "TM", iso3: "TKM", name: "Turkmenistan", name_fr: "Turkménistan", flag: 203 },
+        { iso2: "TC", iso3: "TCA", name: "Turks and Caicos Islands", name_fr: "Turks-et-Caïcos, Îles", flag: 204 },
+        { iso2: "TV", iso3: "TUV", name: "Tuvalu", name_fr: "Tuvalu", flag: 205 },
+        { iso2: "UG", iso3: "UGA", name: "Uganda", name_fr: "Ouganda", flag: 206 },
+        { iso2: "UA", iso3: "UKR", name: "Ukraine", name_fr: "Ukraine", alternates: [ "Ukraina" ], flag: 207 },
+        { iso2: "AE", iso3: "ARE", name: "United Arab Emirates", name_fr: "Émirats arabes unis", alternates: [ "UAE" ], flag: 208 },
+        { iso2: "GB", iso3: "GBR", name: "United Kingdom", name_fr: "Royaume-Uni", alternates: [ "Britain", "England", "Great Britain", "Northern Ireland", "Scotland", "UK", "Wales" ], flag: 78 },
+        { iso2: "US", iso3: "USA", name: "United States", name_fr: "États-Unis", alternates: [ "America", "United States of America" ], flag: 210 },
+        { iso2: "UM", iso3: "UMI", name: "United States Minor Outlying Islands", name_fr: "Îles Mineures Éloignées des États-Unis", flag: 0 },
+        { iso2: "UY", iso3: "URY", name: "Uruguay", name_fr: "Uruguay", flag: 209 },
+        { iso2: "UZ", iso3: "UZB", name: "Uzbekistan", name_fr: "Ouzbékistan", flag: 211 },
+        { iso2: "VU", iso3: "VUT", name: "Vanuatu", name_fr: "Vanuatu", flag: 212 },
+        { iso2: "VE", iso3: "VEN", name: "Venezuela, Bolivarian Republic of", name_fr: "Venezuela, République Bolivarienne du", flag: 213 },
+        { iso2: "VN", iso3: "VNM", name: "Viet Nam", name_fr: "Viet Nam", flag: 214 },
+        { iso2: "VG", iso3: "VGB", name: "Virgin Islands (British)", name_fr: "Îles Vierges Britanniques", flag: 30 },
+        { iso2: "VI", iso3: "VIR", name: "Virgin Islands (U.S.)", name_fr: "Îles Vierges des États-Unis", flag: 215 },
+        { iso2: "WF", iso3: "WLF", name: "Wallis and Futuna", name_fr: "Wallis-et-Futuna", flag: 216 },
+        { iso2: "EH", iso3: "ESH", name: "Western Sahara", name_fr: "Sahara Occidental", flag: 0 },
+        { iso2: "YE", iso3: "YEM", name: "Yemen", name_fr: "Yémen", flag: 217 },
+        { iso2: "ZM", iso3: "ZMB", name: "Zambia", name_fr: "Zambie", flag: 218 },
+        { iso2: "ZW", iso3: "ZWE", name: "Zimbabwe", name_fr: "Zimbabwe", flag: 219 }
     ];
 
     /** Input field modes. 
@@ -2957,6 +3160,7 @@
     * @property {string} [codesList] - A comma separated list of ISO 2-char or 3-char country codes for the basis of the list.
     * @property {boolean} [fillOthers=true] - If a codesList is provided, any remaining countries will be appended to the bottom of the list.
     * @property {prepopulate} [fillOthers=true] - When the country is changed, any fields will be populated.
+    * @property {string} [nameLanguage=en] - The language for country names, only en and fr are supported.
     * @property {pca.countryNameType} [nameType=NAME] - The text format of the country name for populating an input field.
     * @property {pca.countryNameType} [valueType=ISO3] - The value format of a country option for populating a select list.
     */
@@ -2987,11 +3191,11 @@
         countrylist.options.list = countrylist.options.list || {};
         countrylist.options.populate = typeof countrylist.options.populate == 'boolean' ? countrylist.options.populate : true;
         countrylist.options.prepopulate = typeof countrylist.options.prepopulate == 'boolean' ? countrylist.options.prepopulate : true;
+        countrylist.options.language = countrylist.options.language || "en";
         countrylist.options.nameType = countrylist.options.nameType || pca.countryNameType.NAME;
-        countrylist.options.valueType = countrylist.options.valueType || pca.countryNameType.ISO3;
+        countrylist.options.valueType = countrylist.options.valueType || pca.countryNameType.NAME;
         countrylist.options.fallbackCode = countrylist.options.fallbackCode || "GBR";
 
-        countrylist.template = "<div class='pcaflag'></div><div class='pcaflaglabel'>{name}</div>";
         /** The list
         * @type {pca.AutoComplete} */
         countrylist.autocomplete = new pca.AutoComplete(countrylist.fields, countrylist.options.list);
@@ -2999,13 +3203,15 @@
         * @type {pca.Country} */
         countrylist.country = null;
         countrylist.textChanged = false;
+        countrylist.nameProperty = countrylist.options.language == "fr" ? "name_fr" : "name";
+        countrylist.template = "<div class='pcaflag'></div><div class='pcaflaglabel'>{" + countrylist.nameProperty + "}</div>";
 
         countrylist.load = function () {
             pca.addClass(countrylist.autocomplete.element, "pcacountrylist");
-
+            
             //add countries to the list
             if (countrylist.options.codesList) {
-                var codesSplit = countrylist.options.codesList.replace(/\s/g, "").split(","),
+                var codesSplit =  countrylist.options.codesList.replace(/\s/g, "").split(","),
                     filteredList = [];
 
                 countrylist.autocomplete.clear();
@@ -3014,13 +3220,13 @@
                     var code = codesSplit[i].toString().toUpperCase();
 
                     for (var c = 0; c < pca.countries.length; c++) {
-                        if (pca.countries[c].iso2 == code || pca.countries[c].iso3 == code) {
+                        if  (pca.countries[c].iso2 == code || pca.countries[c].iso3 == code) {
                             filteredList.push(pca.countries[c]);
                             break;
-                        }
+                        } 
                     }
                 }
-
+                
                 if (countrylist.options.fillOthers) {
                     for (var o = 0; o < pca.countries.length; o++) {
                         var contains = false;
@@ -3029,7 +3235,7 @@
                             if (pca.countries[o].iso3 == filteredList[f].iso3)
                                 contains = true;
                         }
-
+                        
                         if (!contains) filteredList.push(pca.countries[o]);
                     }
                 }
@@ -3049,8 +3255,16 @@
                 countrylist.autocomplete.showAll();
             });
 
+            //user has changed country on the form
             function textChanged(field) {
-                countrylist.setCountry(pca.getValue(field));
+                //for a select list we should try the value and label
+                if (pca.selectList(field)) {
+                    var selected = pca.getSelectedItem(field);
+                    countrylist.change(countrylist.find(selected.value) || countrylist.find(selected.text));
+                }
+                else
+                    countrylist.setCountry(pca.getValue(field));
+
                 countrylist.textChanged = false;
             }
 
@@ -3066,8 +3280,8 @@
             //set the initial value
             if (countrylist.options.value) countrylist.country = countrylist.find(countrylist.options.value);
             if (!countrylist.country && countrylist.options.defaultCode) countrylist.country = countrylist.find(countrylist.options.defaultCode);
-
-            //use the fallback or first in the first
+            
+            //use the fallback or first in the list
             countrylist.country = countrylist.country || (countrylist.options.codesList ? countrylist.first() : countrylist.find(countrylist.options.fallbackCode)) || countrylist.first() || countrylist.find(countrylist.options.fallbackCode);
 
             countrylist.fire("load");
@@ -3075,25 +3289,25 @@
 
         /** Returns the name of the country with the current nameType option. 
         * @param {pca.Country} [country] - The country object to get the desired name of. */
-        countrylist.getName = function (country) {
+        countrylist.getName = function(country) {
             switch (countrylist.options.nameType) {
                 case pca.countryNameType.NAME:
-                    return (country || countrylist.country).name;
+                    return (country || countrylist.country)[countrylist.nameProperty];
                 case pca.countryNameType.ISO2:
                     return (country || countrylist.country).iso2;
                 case pca.countryNameType.ISO3:
                     return (country || countrylist.country).iso3;
             }
 
-            return (country || countrylist.country).name;
+            return (country || countrylist.country)[countrylist.nameProperty];
         }
-
+        
         /** Returns the value of the country with the current valueType option. 
         * @param {pca.Country} [country] - The country object to get the desired value of. */
-        countrylist.getValue = function (country) {
+        countrylist.getValue = function(country) {
             switch (countrylist.options.valueType) {
                 case pca.countryNameType.NAME:
-                    return (country || countrylist.country).name;
+                    return (country || countrylist.country)[countrylist.nameProperty];
                 case pca.countryNameType.ISO2:
                     return (country || countrylist.country).iso2;
                 case pca.countryNameType.ISO3:
@@ -3105,7 +3319,7 @@
 
         /** Populates all bound country fields. 
         * @fires populate */
-        countrylist.populate = function () {
+        countrylist.populate = function() {
             if (!countrylist.options.populate) return;
 
             var name = countrylist.getName(),
@@ -3114,13 +3328,13 @@
             for (var i = 0; i < countrylist.fields.length; i++) {
                 var countryField = pca.getElement(countrylist.fields[i]),
                     currentValue = pca.getValue(countryField);
-
+                
                 pca.setValue(countryField, (pca.selectList(countryField) ? value : name));
 
                 if (countrylist.options.prepopulate && currentValue != pca.getValue(countryField))
                     pca.fire(countryField, "change");
             }
-
+                
             countrylist.fire("populate");
         }
 
@@ -3133,16 +3347,16 @@
             function isAlternate(item) {
                 if (item.data.alternates) {
                     for (var a = 0; a < item.data.alternates.length; a++) {
-                        if (item.data.alternates[a].toUpperCase() == country)
+                        if (item.data.alternates[a].toUpperCase() == country) 
                             return true;
                     }
                 }
-
+            
                 return false;
             }
 
             return (countrylist.autocomplete.list.collection.first(function (item) {
-                return item.data.iso2.toUpperCase() == country || item.data.iso3.toUpperCase() == country || item.data.name.toUpperCase() == country || isAlternate(item);
+                return item.data.iso2.toUpperCase() == country || item.data.iso3.toUpperCase() == country || item.data.name.toUpperCase() == country || item.data.name_fr.toUpperCase() == country || isAlternate(item);
             }) || {}).data;
         }
 
@@ -3185,7 +3399,7 @@
 
             return flag;
         }
-
+        
         /** Sets the country
         * @param {string} country - The country name or code to change to. */
         countrylist.setCountry = function (country) {
@@ -3229,6 +3443,150 @@
         COUNTRY: 8
     };
 
+    /** Search filtering modes.
+    * @memberof pca  
+    * @readonly
+    * @enum {string} */
+    pca.filteringMode = {
+        /** Everything will be returned */
+        EVERYTHING: "Everything",
+        /** Only postcode results will be returned */
+        POSTCODES: "PostalCodes",
+        /** Only cities, towns and districts will be returned */
+        PLACES: "Places",
+        /** Only companies will be returned */
+        COMPANIES: "Companies",
+        /** Only residential properties will be returned */
+        RESIDENTIAL: "Residential"
+    };
+
+    /** Search ordering mode.
+    * @memberof pca  
+    * @readonly
+    * @enum {string} */
+    pca.orderingMode = {
+        /** Default ordering will be used */
+        DEFAULT: "",
+        /** Results will be ordered by current proximity */
+        LOCATION: "UserLocation"
+    };
+
+    /** Text messages to display
+    * @memberof pca */
+    pca.messages = {
+        "en": {
+            DIDYOUMEAN: "Did you mean:",
+            NORESULTS: "No results found",
+            KEEPTYPING: "Keep typing your address to display more results",
+            RETRIEVEERROR: "Record could not be retrieved",
+            SERVICEERROR: "Service Error:",
+            COUNTRYSELECT: "Select Country",
+            NOLOCATION: "Sorry, we could not get your location",
+            NOCOUNTRY: "Sorry, we could not find this country",
+            MANUALENTRY: "I cannot find my address. Let me type it in"
+        },
+        "cy": {
+            DIDYOUMEAN: "A oeddech yn meddwl:",
+            NORESULTS: "Dim canlyniadau ar ganlyniadau",
+            KEEPTYPING: "Cadwch teipio eich cyfeiriad i arddangos mwy o ganlyniadau",
+            RETRIEVEERROR: "Ni allai cofnod yn cael ei hadalw",
+            SERVICEERROR: "Gwall gwasanaeth:",
+            COUNTRYSELECT: "Dewiswch gwlad",
+            NOLOCATION: "Mae'n ddrwg gennym, nid oeddem yn gallu cael eich lleoliad",
+            NOCOUNTRY: "Mae'n ddrwg gennym, ni allem ddod o hyd y wlad hon",
+            MANUALENTRY: "Ni allaf ddod o hyd i fy nghyfeiriad. Gadewch i mi deipio mewn"
+        },
+        "fr": {
+            DIDYOUMEAN: "Vouliez-vous dire:",
+            NORESULTS: "Aucun résultat n'a été trouvé",
+            KEEPTYPING: "Continuer à taper votre adresse pour afficher plus de résultats",
+            RETRIEVEERROR: "Enregistrement n'a pas pu être récupéré",
+            SERVICEERROR: "Erreur de service:",
+            COUNTRYSELECT: "Changer de pays",
+            NOLOCATION: "Désolé, nous n'avons pas pu obtenir votre emplacement",
+            NOCOUNTRY: "Désolé, nous n'avons pas trouvé ce pays",
+            MANUALENTRY: "Je ne peux pas trouver mon adresse. Permettez-moi de taper dans"
+        },
+        "de": {
+            DIDYOUMEAN: "Meinten Sie:",
+            NORESULTS: "Keine Adressen gefunden",
+            KEEPTYPING: "Halten Sie Ihre Adresse eingeben, um weitere Ergebnisse anzuzeigen",
+            RETRIEVEERROR: "Die Bilanz konnte nicht abgerufen werden",
+            SERVICEERROR: "Service-Fehler:",
+            COUNTRYSELECT: "Land wechseln",
+            NOLOCATION: "Leider konnten wir nicht bekommen, Ihren Standort",
+            NOCOUNTRY: "Leider konnten wir nicht finden, dieses Land",
+            MANUALENTRY: "Ich kann meine Adresse nicht finden. Lassen Sie mich geben Sie es in"
+        }
+    };
+
+    /** An example retrieve response.
+    * @memberof pca */
+    pca.exampleAddress = {
+        "Id": "GBR|PR|52509479|0|0|0",
+        "DomesticId": "52509479",
+        "Language": "ENG",
+        "LanguageAlternatives": "ENG",
+        "Department": "",
+        "Company": "Postcode Anywhere (Europe) Ltd",
+        "SubBuilding": "",
+        "BuildingNumber": "",
+        "BuildingName": "Waterside",
+        "SecondaryStreet": "",
+        "Street": "Basin Road",
+        "Block": "",
+        "Neighbourhood": "",
+        "District": "",
+        "City": "Worcester",
+        "Line1": "Waterside",
+        "Line2": "Basin Road",
+        "Line3": "",
+        "Line4": "",
+        "Line5": "",
+        "AdminAreaName": "Worcester",
+        "AdminAreaCode": "47UE",
+        "Province": "Worcestershire",
+        "ProvinceName": "Worcestershire",
+        "ProvinceCode": "",
+        "PostalCode": "WR5 3DA",
+        "CountryName": "United Kingdom",
+        "CountryIso2": "GB",
+        "CountryIso3": "GBR",
+        "CountryIsoNumber": 826,
+        "SortingNumber1": "94142",
+        "SortingNumber2": "",
+        "Barcode": "(WR53DA1PX)",
+        "Label": "Postcode Anywhere (Europe) Ltd\nWaterside\nBasin Road\n\nWorcester\nWR5 3DA\nUnited Kingdom",
+        "Type": "Commercial",
+        "DataLevel": "Premise",
+        "Field1": "",
+        "Field2": "",
+        "Field3": "",
+        "Field4": "",
+        "Field5": "",
+        "Field6": "",
+        "Field7": "",
+        "Field8": "",
+        "Field9": "",
+        "Field10": "",
+        "Field11": "",
+        "Field12": "",
+        "Field13": "",
+        "Field14": "",
+        "Field15": "",
+        "Field16": "",
+        "Field17": "",
+        "Field18": "",
+        "Field19": "",
+        "Field20": ""
+    };
+
+    /** Formatting templates.
+    * @memberof pca */
+    pca.templates = {
+        AUTOCOMPLETE: "{HighlightedText}{<span class='pcadescription'>{Description}</span>}"
+    };
+
     /**
     * Address control field binding.
     * @typedef {Object} pca.Address.Binding
@@ -3260,13 +3618,16 @@
     * @property {number} [promptDelay=0] - The time in milliseconds before the control will prompt the user for more detail.
     * @property {boolean} [setCursor=false] - Updates the input field with the current search text.
     * @property {number} [minSearch=1] - Search will be triggered on field focus.
-    * @property {number} [maxItems=0] - The maximum number of items to show (0 = disabled).
+    * @property {number} [minItems=7] - The minimum number of items to show in the list.
+    * @property {number} [maxItems=7] - The maximum number of items to show in the list.
     * @property {boolean} [manualEntry=false] - If no results are found, the message can be clicked to disable the control.
     * @property {number} [disableTime=60000] - The time in milliseconds to disable the control for manual entry.
     * @property {boolean} [suppressAutocomplete=true] - Suppress the default browser field autocomplete on search fields.
     * @property {boolean} [setCountryByIP=false] - Automatically set the country based upon the user IP address.
     * @property {string} [culture] - Force set the culture for labels, e.g. "en-us", "fr-ca".
     * @property {string} [languagePreference] - The preferred language for the selected address, e.g. "eng", "fra".
+    * @property {pca.filteringMode} filteringMode - The type of results to search for.
+    * @property {pca.orderingMode} orderingMode - The order in which to display results.
     * @property {pca.CountryList.Options} [countries] - Options for the country list.
     * @property {pca.AutoComplete.Options} [list] - Options for the search list.
     * @property {pca.Address.BarOptions} [bar] - Options for the address control footer bar.
@@ -3282,121 +3643,6 @@
     pca.Address = function (fields, options) {
         /** @lends pca.Address.prototype */
         var address = new pca.Eventable(this);
-
-        /** Text messages to display */
-        address.messages = {
-            "en": {
-                DIDYOUMEAN: "Did you mean:",
-                NORESULTS: "No results found",
-                KEEPTYPING: "Keep typing your address to display more results",
-                RETRIEVEERROR: "Record could not be retrieved",
-                SERVICEERROR: "Service Error:",
-                COUNTRYSELECT: "Select Country",
-                NOLOCATION: "Sorry, we could not get your location",
-                NOCOUNTRY: "Sorry, we could not find this country"
-            },
-            "cy": {
-                DIDYOUMEAN: "A oeddech yn meddwl:",
-                NORESULTS: "Dim canlyniadau ar ganlyniadau",
-                KEEPTYPING: "Cadwch teipio eich cyfeiriad i arddangos mwy o ganlyniadau",
-                RETRIEVEERROR: "Ni allai cofnod yn cael ei hadalw",
-                SERVICEERROR: "Gwall gwasanaeth:",
-                COUNTRYSELECT: "Dewiswch gwlad",
-                NOLOCATION: "Mae'n ddrwg gennym, nid oeddem yn gallu cael eich lleoliad",
-                NOCOUNTRY: "Mae'n ddrwg gennym, ni allem ddod o hyd y wlad hon"
-            },
-            "fr": {
-                DIDYOUMEAN: "Vouliez-vous dire:",
-                NORESULTS: "Aucun r�sultat n'a �t� trouv�",
-                KEEPTYPING: "Continuer � taper votre adresse pour afficher plus de r�sultats",
-                RETRIEVEERROR: "Enregistrement n'a pas pu �tre r�cup�r�",
-                SERVICEERROR: "Erreur de service:",
-                COUNTRYSELECT: "Changer de pays",
-                NOLOCATION: "D�sol�, nous n'avons pas pu obtenir votre emplacement",
-                NOCOUNTRY: "D�sol�, nous n'avons pas trouv� ce pays"
-            },
-            "de": {
-                DIDYOUMEAN: "Meinten Sie:",
-                NORESULTS: "Keine Adressen gefunden",
-                KEEPTYPING: "Halten Sie Ihre Adresse eingeben, um weitere Ergebnisse anzuzeigen",
-                RETRIEVEERROR: "Die Bilanz konnte nicht abgerufen werden",
-                SERVICEERROR: "Service-Fehler:",
-                COUNTRYSELECT: "Land wechseln",
-                NOLOCATION: "Leider konnten wir nicht bekommen, Ihren Standort",
-                NOCOUNTRY: "Leider konnten wir nicht finden, dieses Land"
-            }
-        };
-
-        //capture plus searching modes
-        address.searchMode = {
-            EVERYTHING: "Everything",
-            POSTCODES: "PostalCodes",
-            COMPANIES: "Companies",
-            PLACES: "Places"
-        };
-
-        address.templates = {
-            AUTOCOMPLETE: "{HighlightedText}{<span class='pcadescription'>{Description}</span>}"
-        };
-
-        address.example = {
-            "Id": "GBR|PR|52509479|0|0|0",
-            "DomesticId": "52509479",
-            "Language": "ENG",
-            "LanguageAlternatives": "ENG",
-            "Department": "",
-            "Company": "Postcode Anywhere",
-            "SubBuilding": "Waterside",
-            "BuildingNumber": "",
-            "BuildingName": "Finger Wharf",
-            "SecondaryStreet": "",
-            "Street": "Basin Road",
-            "Block": "",
-            "Neighbourhood": "",
-            "District": "",
-            "City": "Worcester",
-            "Line1": "Waterside",
-            "Line2": "Finger Wharf",
-            "Line3": "Basin Road",
-            "Line4": "",
-            "Line5": "",
-            "AdminAreaName": "Worcester",
-            "AdminAreaCode": "47UE",
-            "Province": "Worcestershire",
-            "ProvinceName": "Worcestershire",
-            "ProvinceCode": "",
-            "PostalCode": "WR5 3DA",
-            "CountryName": "United Kingdom",
-            "CountryIso2": "GB",
-            "CountryIso3": "GBR",
-            "CountryIsoNumber": 826,
-            "SortingNumber1": "94142",
-            "SortingNumber2": "",
-            "Barcode": "(WR53DA1PX)",
-            "Label": "Postcode Anywhere\nWaterside\nFinger Wharf\nWorcester\nWR5 3DA\nUnited Kingdom",
-            "Type": "Commercial",
-            "DataLevel": "Premise",
-            "Field1": "",
-            "Field2": "",
-            "Field3": "",
-            "Field4": "",
-            "Field5": "",
-            "Field6": "",
-            "Field7": "",
-            "Field8": "",
-            "Field9": "",
-            "Field10": "",
-            "Field11": "",
-            "Field12": "",
-            "Field13": "",
-            "Field14": "",
-            "Field15": "",
-            "Field16": "",
-            "Field17": "",
-            "Field18": "",
-            "Field19": "",
-            "Field20": ""
-        }
 
         /** The current field bindings 
         * @type {Array.<pca.Address.Binding>} */
@@ -3415,7 +3661,8 @@
         address.options.onlyInputs = typeof address.options.onlyInputs == 'boolean' ? address.options.onlyInputs : false;
         address.options.autoSearch = typeof address.options.autoSearch == 'boolean' ? address.options.autoSearch : false;
         address.options.minSearch = address.options.minSearch || 1;
-        address.options.maxItems = address.options.maxItems || 0;
+        address.options.maxItems = address.options.maxItems || 7;
+        address.options.minItems = address.options.minItems || 7;
         address.options.advancedFields = address.options.advancedFields || [];
         address.options.manualEntry = address.options.manualEntry || false;
         address.options.disableTime = address.options.disableTime || 60000;
@@ -3429,19 +3676,23 @@
         address.options.promptDelay = address.options.promptDelay || 0;
         address.options.setCursor = typeof address.options.setCursor == 'boolean' ? address.options.setCursor : false;
         address.options.languagePreference = address.options.languagePreference || "";
+        address.options.filteringMode = address.options.filteringMode || pca.filteringMode.EVERYTHING;
+        address.options.orderingMode = address.options.orderingMode || pca.orderingMode.DEFAULT;
         address.options.countries = address.options.countries || {};
         address.options.countries.defaultCode = address.options.countries.defaultCode || "";
         address.options.countries.value = address.options.countries.value || "";
         address.options.countries.prepopulate = typeof address.options.countries.prepopulate == 'boolean' ? address.options.countries.prepopulate : true;
         address.options.list = address.options.list || {};
         address.options.list.name = address.options.name ? address.options.name + "_results" : "";
+        address.options.list.maxItems = address.options.list.maxItems || address.options.maxItems;
+        address.options.list.minItems = address.options.list.minItems || address.options.minItems;
         address.options.countries.list = address.options.countries.list || pca.merge(address.options.list, {});
         address.options.countries.list.name = address.options.name ? address.options.name + "_countries" : "";
         address.options.bar = address.options.bar || {};
         address.options.bar.visible = typeof address.options.bar.visible == 'boolean' ? address.options.bar.visible : true;
         address.options.bar.showCountry = typeof address.options.bar.showCountry == 'boolean' ? address.options.bar.showCountry : true;
         address.options.bar.showLogo = typeof address.options.bar.showLogo == 'boolean' ? address.options.bar.showLogo : true;
-        address.options.bar.logoLink = typeof address.options.bar.logoLink == 'boolean' ? address.options.bar.logoLink : true;
+        address.options.bar.logoLink = typeof address.options.bar.logoLink == 'boolean' ? address.options.bar.logoLink : false;
         address.options.bar.logoClass = address.options.bar.logoClass || "pcalogo" || "pcalogo";
         address.options.bar.logoUrl = address.options.bar.logoUrl || "http://www.postcodeanywhere.co.uk/address-capture-software" || "http://www.postcodeanywhere.co.uk/address-capture-software";
 
@@ -3455,6 +3706,8 @@
         address.geolocation = null; //users current geolocation when searching by location
         address.loaded = false; //current state of the control
         address.language = "en"; //current language code for the control
+        address.filteringMode = address.options.filteringMode; //search filtering mode
+        address.orderingMode = address.options.orderingMode; //search ordering mode
 
         /** The search list
         * @type {pca.AutoComplete} */
@@ -3496,11 +3749,11 @@
                         if (elem) elem.autocomplete = "off";
                     }
                 }
-
+                   
                 //check for advanced fields
                 field.field = address.checkFormat(field.field);
             }
-
+            
             //set the current language for UI
             address.detectLanguage();
 
@@ -3516,8 +3769,13 @@
                     address.countrylist.autocomplete.handleKey(key);
                 else if (address.autocomplete.controlDown && key == 40)
                     address.switchToCountrySelect();
-                else if (key == 0 || key == 8 || key > 36)
+                else if (key == 0 || key == 8 || key == 32 || key > 36)
                     address.searchFromField();
+            });
+
+            //listen to the user pasting something
+            address.autocomplete.listen("paste", function() {
+                address.searchFromField();
             });
 
             //show just the bar when a field gets focus
@@ -3525,6 +3783,16 @@
 
             //listen to blur event for custom code
             address.autocomplete.listen("blur", address.blur);
+
+            //pass through the show event
+            address.autocomplete.listen("show", function () {
+                address.fire("show");
+            });
+
+            //pass through the hide event
+            address.autocomplete.listen("hide", function () {
+                address.fire("hide");
+            });
 
             //search on double click
             address.autocomplete.listen("dblclick", address.searchFromField);
@@ -3541,9 +3809,12 @@
             if (!address.options.countries.value && countryFields.length)
                 address.options.countries.value = pca.getValue(countryFields[0]);
 
+            //set the language for country names
+            address.options.countries.language = address.language;
+
             //create a countrylist to change the current country
             address.countrylist = new pca.CountryList(countryFields, address.options.countries);
-            address.countrylist.autocomplete.options.emptyMessage = address.messages[address.language].NOCOUNTRY;
+            address.countrylist.autocomplete.options.emptyMessage = pca.messages[address.language].NOCOUNTRY;
             address.country = address.countrylist.country.iso3;
 
             //when the country is changed update the address list
@@ -3558,6 +3829,11 @@
                 address.countrylist.autocomplete.list.first();
             });
 
+            //pass through the show event
+            address.countrylist.autocomplete.listen("hide", function() {
+                address.fire("show");
+            });
+
             //when the list is closed restore the search state
             address.countrylist.autocomplete.listen("hide", function () {
                 address.autocomplete.enable();
@@ -3566,7 +3842,12 @@
                     pca.setValue(address.autocomplete.field, address.storedSearch);
 
                 address.storedSearch = null;
+                address.fire("hide");
             });
+
+            //do not show the button if there is only one country
+            if (address.countrylist.autocomplete.list.collection.count == 1)
+                address.options.bar.showCountry = false;
 
             //create a flag icon and add to the footer of the search list
             var flagbutton = pca.create("div", { className: "pcaflagbutton" }),
@@ -3576,7 +3857,7 @@
 
             //clicking the flag button will show the country list
             pca.listen(flagbutton, "click", address.switchToCountrySelect);
-
+            
             //create another flag icon on the country list to close it
             var countryFlagbutton = pca.create("div", { className: "pcaflagbutton" }),
                 countryFlag = address.countrylist.flag();
@@ -3587,7 +3868,7 @@
             pca.listen(countryFlagbutton, "click", address.switchToSearchMode);
 
             //add the country select message to the footer - shown by default
-            var message = pca.create("div", { className: "pcamessage pcadisableselect", innerHTML: address.messages[address.language].COUNTRYSELECT });
+            var message = pca.create("div", { className: "pcamessage pcadisableselect", innerHTML: pca.messages[address.language].COUNTRYSELECT });
             address.autocomplete.footer.setContent(address.options.bar.showCountry ? message : "");
 
             //add the logo to the footer - shown with results
@@ -3617,7 +3898,7 @@
                 address.autocomplete.hide();
 
             //add the country select message to the country select footer - always shown
-            var countryMessage = pca.create("div", { className: "pcamessage pcadisableselect", innerHTML: address.messages[address.language].COUNTRYSELECT });
+            var countryMessage = pca.create("div", { className: "pcamessage pcadisableselect", innerHTML: pca.messages[address.language].COUNTRYSELECT });
             address.countrylist.autocomplete.footer.setContent(address.options.bar.showCountry ? countryMessage : "");
 
             //check if search bar is visible on the countrylist
@@ -3626,12 +3907,12 @@
 
             //get the users country by IP
             if (address.options.setCountryByIP) address.setCountryByIP();
-
+            
             //add ARIA support
             if (options.name) {
                 var listname = options.list.name,
                     countrylistname = options.countries.list.name;
-
+                
                 pca.setAttributes(message, { id: listname + "_label" });
                 pca.setAttributes(flagbutton, { id: listname + "_button", role: "button", "aria-labelledby": listname + "_label" });
                 pca.setAttributes(countryMessage, { id: countrylistname + "_label" });
@@ -3663,14 +3944,14 @@
                     term = term.replace(address.searchContext.search, address.searchContext.text);
                 else
                     address.searchContext = null;
-            }
+            }  
 
             //if the last result is still being used, then filter from the id            
             var lastId = address.searchContext ? (address.searchContext.id || "") : "";
 
             function success(items, response) {
                 if (items.length)
-                    address.display(items, address.templates.AUTOCOMPLETE, response);
+                    address.display(items, pca.templates.AUTOCOMPLETE, response);
                 else
                     noResultsMessage();
             }
@@ -3678,7 +3959,7 @@
             address.fire("search", term);
 
             if (term)
-                pca.fetch(address.options.provider + "/Interactive/Find/v2.00", { Key: address.key, Country: address.country, SearchTerm: term, LanguagePreference: address.language, LastId: lastId, SearchFor: address.searchMode.EVERYTHING, $block: true, $cache: true }, success, address.error);
+                pca.fetch(address.options.provider + "/Interactive/Find/v2.00", { Key: address.key, Country: address.country, SearchTerm: term, LanguagePreference: address.language, LastId: lastId, SearchFor: address.filteringMode, OrderBy: address.orderingMode, $block: true, $cache: true }, success, address.error);
 
             return address;
         }
@@ -3686,7 +3967,8 @@
         /** Searches using the current browser/devices location. 
         * Browser location only supported in HTML5. 
         * @param {number} [latitude] - The latitude to search for. 
-        * @param {number} [longitude] - The longitude to search for. */
+        * @param {number} [longitude] - The longitude to search for.
+        * @fires location */
         address.searchByLocation = function (latitude, longitude) {
             var accuracy = 0;
 
@@ -3698,6 +3980,7 @@
                     accuracy = response.coords.accuracy;
 
                     address.geolocation = response.coords;
+                    pca.fire("location", address.geolocation);
 
                     fetchLocation();
                 }
@@ -3706,14 +3989,15 @@
             }
 
             function noLocation() {
-                address.message(address.messages[address.language].NOLOCATION, true);
+                address.message(pca.messages[address.language].NOLOCATION, true);
+                pca.fire("location");
             }
 
             //retrieve address results
             function fetchLocation() {
                 function success(items, response) {
                     if (items.length)
-                        address.display(items, address.templates.AUTOCOMPLETE, response);
+                        address.display(items, pca.templates.AUTOCOMPLETE, response);
                     else
                         noResultsMessage();
                 }
@@ -3738,7 +4022,7 @@
             var params = { Key: address.key, Id: id, Source: address.options.source, $cache: true };
 
             function success(response) {
-                response.length ? address.populate(response) : address.error(address.messages[address.language].RETRIEVEERROR);
+                response.length ? address.populate(response) : address.error(pca.messages[address.language].RETRIEVEERROR);
             }
 
             //add the advanced fields
@@ -3757,7 +4041,7 @@
 
             //if the error message is not handled throw it
             if (!address.listeners["error"])
-                throw address.messages[address.language].SERVICEERROR + " " + message;
+                throw pca.messages[address.language].SERVICEERROR + " " + message;
         }
 
         //clears any current prompt timer
@@ -3784,7 +4068,7 @@
             //prompt the user for more detail
             if (address.options.prompt) {
                 function showPromptMessage() {
-                    address.message(address.messages[address.language].KEEPTYPING);
+                    address.message(pca.messages[address.language].KEEPTYPING);
                 }
 
                 clearPromptTimer();
@@ -3793,7 +4077,7 @@
                     address.lastActionTimer = window.setTimeout(showPromptMessage, address.options.promptDelay);
                 else showPromptMessage();
             }
-
+                
             address.fire("display", results, attributes);
             return address;
         }
@@ -3814,7 +4098,7 @@
         function noResultsMessage() {
             address.reset();
             address.autocomplete.show();
-            address.autocomplete.header.clear().setContent(pca.create("div", { className: "pcamessage", innerHTML: address.messages[address.language].NORESULTS, onclick: address.options.manualEntry ? address.manualEntry : function () { } }, address.options.manualEntry ? "cursor:pointer;" : "")).show();
+            address.autocomplete.header.clear().setContent(pca.create("div", { className: "pcamessage", innerHTML: pca.messages[address.language].NORESULTS, onclick: address.options.manualEntry ? address.manualEntry : function () {} }, address.options.manualEntry ? "cursor:pointer;": "")).show();
             address.showFooterMessage();
             address.autocomplete.clear().list.hide();
             address.fire("noresults");
@@ -3843,7 +4127,7 @@
                     pca.setValue(address.autocomplete.field, searchText + " ");
                     address.autocomplete.field.focus();
                 }
-
+                
                 address.searchContext = { id: suggestion.Id, text: suggestion.Text, search: searchText };
                 address.search(searchText);
             }
@@ -3925,7 +4209,7 @@
                 for (var fa = 0; fa < address.fields.length; fa++)
                     address.fields[fa].field = address.fields[fa].field.replace(/(Formatted)?Line/g, "FormattedLine");
             }
-
+      
             if (addressLineFields.Building && addressLineFields.Street) addressLineCount++;
 
             //add additional formatted address lines
@@ -3965,44 +4249,44 @@
         * @param {number} lineTotal - The total number of lines required.
         * @param {boolean} includeCompany - Specifies whether to include the company name in the address. 
         * @returns {string} The formatted address line. */
-        address.getAddressLine = function (details, lineNumber, lineTotal, includeCompany) {
-            var lineCount,
+        address.getAddressLine = function (details, lineNumber, fieldCount, includeCompany) {
+            var addressLines,
                 result = "";
 
             includeCompany = includeCompany && !!details.Company;
 
             if (includeCompany) {
-                if (lineNumber == 1 && lineTotal > 1)
+                if (lineNumber == 1 && fieldCount > 1)
                     return details.Company;
 
-                if (lineNumber == 1 && lineTotal == 1)
+                if (lineNumber == 1 && fieldCount == 1)
                     result = details.Company;
                 else {
                     lineNumber--;
-                    lineTotal--;
+                    fieldCount--;
                 }
             }
 
             if (!details.Line1)
-                lineCount = 0
+                addressLines = 0;
             else if (!details.Line2)
-                lineCount = 1
+                addressLines = 1;
             else if (!details.Line3)
-                lineCount = 2
+                addressLines = 2;
             else if (!details.Line4)
-                lineCount = 3
+                addressLines = 3;
             else if (!details.Line5)
-                lineCount = 4
+                addressLines = 4;
             else
-                lineCount = 5;
+                addressLines = 5;
 
-            //work out the current line number and how many address elements should appear on it
-            var start = Math.floor(1 + ((lineCount / lineTotal) + ((lineTotal - (lineNumber - 1)) / lineTotal)) * (lineNumber - 1)),
-                lines = Math.floor((lineCount / lineTotal) + ((lineTotal - lineNumber) / lineTotal));
+            //work out the first address line number to return and how many address elements should appear on it
+            var firstLine = fieldCount >= addressLines ? lineNumber : Math.floor(1 + ((addressLines / fieldCount) + ((fieldCount - (lineNumber - 1)) / fieldCount)) * (lineNumber - 1)),
+                numberOfLines = Math.floor((addressLines / fieldCount) + ((fieldCount - lineNumber) / fieldCount));
 
             //concatenate the address elements to make the address line
-            for (var a = 0; a < lines; a++)
-                result += (result ? ", " : "") + (details["Line" + (a + start)] || "");
+            for (var a = 0; a < numberOfLines; a++)
+                result += (result ? ", " : "") + (details["Line" + (a + firstLine)] || "");
 
             return result;
         }
@@ -4055,8 +4339,8 @@
 
             address.language = culture && culture.length > 1 ? culture.substring(0, 2).toLowerCase() : "en";
 
-            if (!address.messages[address.language])
-                address.language = "en"
+            if (!pca.messages[address.language])
+                address.language = "en";
         }
 
         /** Sets the control culture.
@@ -4072,7 +4356,7 @@
             address.autocomplete.setWidth(width);
             address.countrylist.autocomplete.setWidth(width);
         }
-
+        
         /** Sets the height of the control.
         * @param {number|string} height - The height in pixels for the control. */
         address.setHeight = function (height) {
@@ -4149,12 +4433,12 @@
 
         /** Return the visible state of the control.
         * @returns {boolean} True if the control is visible. */
-        address.visible = function () {
+        address.visible = function() {
             return address.autocomplete.visible || address.countrylist.autocomplete.visible;
         }
 
         /** Repositions the address control. */
-        address.reposition = function () {
+        address.reposition = function() {
             address.autocomplete.reposition();
             address.countrylist.autocomplete.reposition();
         }
@@ -4175,13 +4459,13 @@
 
         /** Permanently removes the address control elements and event listeners from the page. */
         address.destroy = function () {
-            address.autocomplete.destroy();
-            address.countrylist.autocomplete.destroy();
+            if (address.autocomplete) address.autocomplete.destroy();
+            if (address.countrylist) address.countrylist.autocomplete.destroy();
             return address;
         }
 
         /** Reloads the address control */
-        address.reload = function () {
+        address.reload = function() {
             address.destroy();
             address.load();
         }
@@ -4200,6 +4484,13 @@
             return address;
         }
 
+        /** Adds a permanent item to the bottom of the list to enable manual address entry.
+        * @param {string} [message] - The text to display. */
+        address.addManualEntryItem = function (message) {
+            message = message || pca.messages[address.language].MANUALENTRY;
+            address.autocomplete.list.setFooterItem({ text: message }, "<u>{text}</u>", address.manualEntry);
+        }
+
         /** Checks whether the control is bound to a particular element.
         * @param {string|HTMLElement} element - The element or element id to check for.
         * @returns {boolean} True if the control is bound to that element. */
@@ -4213,20 +4504,20 @@
 
             return false;
         }
-
+        
         /** Checks a format string for non-standard fields.
         * @param {string} format - The address line format string to check.
         * @returns {string} The standardised format string. */
-        address.checkFormat = function (format) {
+        address.checkFormat = function(format) {
             function standardField(field) {
-                for (var i in address.example) {
+                for (var i in pca.exampleAddress) {
                     if (i == field) return true;
                 }
 
                 return false;
             }
 
-            return format.replace(/\{(\w+)\}/g, function (m, c) {
+            return format.replace(/\{(\w+)([^\}\w])?\}/g, function (m, c) {
                 if (!standardField(c)) {
                     address.advancedFields.push(m);
                     return "{Field" + address.advancedFields.length + "}";

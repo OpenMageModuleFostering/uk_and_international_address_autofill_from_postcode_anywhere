@@ -1,9 +1,9 @@
-/*! Copyright � 2009-2014 Postcode Anywhere (Holdings) Ltd. (http://www.postcodeanywhere.co.uk)
+﻿/*! Copyright © 2009-2014 Postcode Anywhere (Holdings) Ltd. (http://www.postcodeanywhere.co.uk)
  *
- * Address v3.20
+ * Address v3.30
  * Styles for the address control.
  *
- * WEB-1-1 11/04/2014 10:18:23
+ * WEB-1-1 10/10/2014 09:39:33
  */
 .pca 
 {
@@ -11,6 +11,12 @@
     padding: 0;
     position: static;
     border: none;
+    box-sizing: content-box;
+}
+
+.pca * 
+{
+    box-sizing: content-box;
 }
 
 .pca .pcatext
@@ -126,6 +132,7 @@
     border-bottom-color: #ccc;
     background-color: #fafafa;
     height: 30px;
+    box-sizing: content-box;
     background: #f9f9f9;
     background: -moz-linear-gradient(top,  #f9f9f9 0%, #ececec 100%);
     background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#f9f9f9), color-stop(100%,#ececec));
@@ -207,6 +214,12 @@
     padding: 8px;
     margin: 15px;
     background: #fff;
+}
+
+.pca .pcamodal .pcacontent .pcainputrow input:invalid {
+    -webkit-box-shadow: 0 0 1.5px 1px #ff0000;
+    -moz-box-shadow: 0 0 1.5px 1px #ff0000;
+    box-shadow: 0 0 1.5px 1px #ff0000;
 }
 
 .pca .pcamodal .pcacontent .pcainputrow .pcahalf
@@ -341,13 +354,15 @@
 
 .pca .pcaautocomplete .pcafooter .pcaflagbutton
 {
-    width: 32px;
+    width: 31px;
     height: 21px;
     position: relative;
     float: right;
-    margin: 5px 6px 0 0;
+    padding: 5px 6px;
     cursor: pointer;
     background-image: url(https://services.postcodeanywhere.co.uk/images/icons/flag_sq_down.png);
+    background-position: 5px;
+    background-repeat: no-repeat;
 }
 
 .pca .pcaautocomplete .pcafooter .pcaflagbutton:hover
@@ -357,8 +372,8 @@
 
 .pca .pcaautocomplete .pcafooter .pcaflagbutton .pcaflag 
 {
-    top: 4px;
-    left: 5px;
+    top: 9px;
+    left: 9px;
 }
 
 .pca .pcaautocomplete .pcaflaglabel
@@ -384,7 +399,6 @@
     margin: 8px 5px 8px 11px;
     position: relative;
     float: left;
-    cursor: pointer;
     background-image: url(https://services.postcodeanywhere.co.uk/images/icons/captureplus/capture_plus_logo.png);  
 }
 
@@ -396,7 +410,6 @@
     margin: 8px 5px 8px 11px;
     position: relative;
     float: left;
-    cursor: pointer;
     background-image: url(https://services.postcodeanywhere.co.uk/images/icons/captureplus/address_complete_logo_en.png);
 }
 
@@ -408,13 +421,12 @@
 
 .pca .pcaautocomplete .pcafooter .dtlogo
 {
-    width: 60px;
+    width: 132px;
     height: 20px;
     font-size: 0;
     margin: 5px 5px 8px 9px;
     position: relative;
     float: left;
-    cursor: pointer;
     background-image: url(https://services.postcodeanywhere.co.uk/images/icons/captureplus/data_tools_logo.png);
 }
 
@@ -423,3 +435,4 @@
     color: #888;
     margin-left: 8px;
 }
+

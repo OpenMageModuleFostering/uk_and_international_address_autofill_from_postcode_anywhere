@@ -44,4 +44,11 @@
             <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
         </reference>
     </ecommerceteam_tcheckout_index_index>
+
+    <!-- Support for One Page Checkout -->
+    <opc_index_index>
+        <reference name="head">
+            <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
+        </reference>
+    </opc_index_index>
 </layout>

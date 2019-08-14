@@ -8,8 +8,8 @@ class PostcodeAnywhere_CapturePlus_Block_ScriptAccount extends Mage_Adminhtml_Bl
         if ($section == 'captureplus') {
             $head = $this->getLayout()->getBlock('head');
             if ($head) {
-                $head->addCss('captureplus/address-3.20.min.css');
-                $head->addJs('captureplus/address-3.20.min.js');
+                $head->addCss('captureplus/address-3.30.min.css');
+                $head->addJs('captureplus/address-3.30.min.js');
             }
         }
         parent::_prepareLayout();

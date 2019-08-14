@@ -1,11 +1,27 @@
 <?php
 $pcaAccCode = Mage::getStoreConfig('captureplus/settings/account_code');
 $pcaCustomCode = Mage::getStoreConfig('captureplus/settings/custom_code');
-$pcaMappings = Mage::getStoreConfig('captureplus/settings/custom_mappings');
+$pcaMappings = Mage::getStoreConfig('captureplus/settings/custom_mappings2');
 if($pcaAccCode) {
 ?>
 
 <script type="text/javascript">
+
+if (!String.prototype.includes) {
+  String.prototype.includes = function(search, start) {
+    'use strict';
+    if (typeof start !== 'number') {
+      start = 0;
+    }
+    
+    if (start + search.length > this.length) {
+      return false;
+    } else {
+      return this.indexOf(search, start) !== -1;
+    }
+  };
+}
+
 
       (function (a, c, b, e) {
     a[b] = a[b] || {}; a[b].initial = { accountCode: "<?php echo $pcaAccCode; ?>", host: "<?php echo $pcaAccCode; ?>.pcapredict.com" };
@@ -20,18 +36,25 @@ if($pcaAccCode) {
      var custInfoAddress = [];
      var editOrderAddress = [];
 
+     var supressCountry = false;
+     var shippingFirstTime = true;
+     var billingFirstTime = true;
+
+     var pcaFirstLoad = false;
+     var shouldSetByIp = false;
+
     (function() {
      var magento = pca.magento = pca.magento || {};
      
      magento.controls = magento.controls || [];
      var capturePlusFields = [];
 
-     document.addEventListener('click', function(e) {
+     document.addEventListener('focus', function(e) {
 
         var backendShippingAddress = [];
         var backendBillingAddress = [];
         var backendCustomerInfoPartial = [];
-        var backendEditOrderAddress = []
+        var backendEditOrderAddress = [];
         <?php echo $pcaMappings; ?>
 
 
@@ -47,11 +70,18 @@ if($pcaAccCode) {
              }
 
              if(contains) {
+
+                 if (shippingFirstTime) {
+                 supressCountry = false;
+                }
+                shippingFirstTime = false;
+
                  shippingAddress = backendShippingAddress;
                  billingAddress.length = 0;
                  custInfoAddress.length = 0;
                  editOrderAddress.length = 0;
                  pca.load();
+                 supressCountry = true;
              }
 
          }
@@ -68,11 +98,17 @@ if($pcaAccCode) {
              }
 
              if(contains) {
+                 if (billingFirstTime) {
+                 supressCountry = false;
+                }
+                billingFirstTime = false;
+
                  billingAddress = backendBillingAddress;
                  shippingAddress.length = 0;
                  custInfoAddress.length = 0;
                  editOrderAddress.length = 0;
                  pca.load();
+                 supressCountry = true;
              }
          }
 
@@ -101,6 +137,7 @@ if($pcaAccCode) {
                  shippingAddress.length = 0;
                  editOrderAddress.length = 0;
                  pca.load();
+                 supressCountry = true;
              }
          }
 
@@ -124,7 +161,7 @@ if($pcaAccCode) {
              }
          }
         
-     }, false);
+     }, true);
       
       pca.on('data', function(source, key, address, variations) {
             
@@ -178,7 +215,7 @@ if($pcaAccCode) {
 
         pca.on('ready', function ()
         {
-            pca.sourceString = 'MagentoExtension-v3.0.7';
+            pca.sourceString = 'MagentoExtension-v3.1.0.2';
         });
 
          pca.on('restrictions', function (service, key, restrictions) {
@@ -190,6 +227,23 @@ if($pcaAccCode) {
                     break;
             }
             
+        });
+
+        pca.on("options", function(service, id, options) {
+            if(options.setCountryByIP !== undefined) {
+                if (!pcaFirstLoad) {
+                    shouldSetByIp = options.setCountryByIP;
+                    pcaFirstLoad = true;
+                }
+            }
+
+            if (shouldSetByIp) {
+                if (supressCountry) {
+                    options.setCountryByIP = false;
+                } else {
+                    options.setCountryByIP = true;
+                }
+            }
         });
 
            pca.on("fields", function(service, id, fields) {       

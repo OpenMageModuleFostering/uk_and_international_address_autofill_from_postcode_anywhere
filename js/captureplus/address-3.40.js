@@ -1,9 +1,9 @@
 ﻿/*! Copyright © 2009-2014 Postcode Anywhere (Holdings) Ltd. (http://www.postcodeanywhere.co.uk)
  *
- * Address v3.30
+ * Address v3.40
  * Component for address lookup integrations.
  *
- * WEB-1-1 10/10/2014 08:28:57
+ * WEB-1-1 18/11/2014 14:04:04
  */
 /** @namespace pca */
 (function (window, undefined) {
@@ -245,12 +245,13 @@
             request.error(event && event.currentTarget && event.currentTarget.statusText ? "Webservice request error: " + event.currentTarget.statusText : "Webservice request failed.");
         }
 
-        request.timeoutError = function (event) {
+        request.timeoutError = function () {
             request.error("Webservice request timed out.");
         }
 
-        //request.index = pca.requests.length;
-        //pca.requests.push(request);
+        request.process = function() {
+            pca.process(request);
+        }
 
         /** Callback for a successful request.
         * @callback pca.Request~successCallback
@@ -438,7 +439,7 @@
         form.action = pca.protocol + "//" + pca.host + "/" + request.service + "/json.ws";
 
         for (var key in request.data)
-            addParameter(key, request.data[key])
+            addParameter(key, request.data[key]);
 
         addParameter("CallbackVariable", "window.name");
         addParameter("CallbackWithScriptTags", "true");
@@ -460,6 +461,12 @@
         var doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.body ? doc.body.appendChild(form) : doc.appendChild(form);
         form.submit();
+    }
+
+    /** Clears blocking requests */
+    pca.clearBlockingRequests = function() {
+        pca.waitingRequest = false;
+        pca.blockRequests = false;
     }
 
     /** Dynamically load an additional script.
@@ -527,7 +534,7 @@
         /** Applies the highlight style.
         * @fires highlight */
         item.highlight = function () {
-            pca.addClass(item.element, highlightClass)
+            pca.addClass(item.element, highlightClass);
             item.fire("highlight");
 
             return item;
@@ -536,7 +543,7 @@
         /** Removes the highlight style.
         * @fires lowlight */
         item.lowlight = function () {
-            pca.removeClass(item.element, highlightClass)
+            pca.removeClass(item.element, highlightClass);
             item.fire("lowlight");
 
             return item;
@@ -877,6 +884,9 @@
     * List options.
     * @typedef {Object} pca.List.Options
     * @property {string} [name] - A reference for the list used an Id for ARIA.
+    * @property {number} [minItems] - The minimum number of items to show in the list.
+    * @property {number} [maxItems] - The maximum number of items to show in the list.
+    * @property {boolean} [allowTab] - Allow the tab key to cycle through items in the list.
     */
 
     /** A HTML list to display items. 
@@ -919,6 +929,7 @@
 
         list.options.minItems = list.options.minItems || 0;
         list.options.maxItems = list.options.maxItems || 10;
+        list.options.allowTab = list.options.allowTab || false;
 
         /** Shows the list.
         * @fires show */
@@ -949,9 +960,9 @@
             if (list.headerItem)
                 list.element.appendChild(list.headerItem.element);
 
-            list.collection.all(function (item) {
+            list.collection.all(function(item) {
                 list.element.appendChild(item.element);
-            })
+            });
 
             if (list.footerItem)
                 list.element.appendChild(list.footerItem.element);
@@ -1155,6 +1166,11 @@
                         list.select();
                         return true;
                     }
+                case 9: //tab
+                    if (list.options.allowTab) {
+                        list.next();
+                        return true;
+                    }
             }
 
             return false;
@@ -1300,6 +1316,7 @@
     * @property {string} [name] - A reference for the list used an Id for ARIA.
     * @property {string} [className] - An additional class to add to the autocomplete.
     * @property {boolean} [force] - Forces the list to bind to the fields.
+    * @property {boolean} [onlyDown] - Force the list to only open downwards.
     * @property {number|string} [width] - Fixes the width to the specified number of pixels.
     * @property {number|string} [height] - Fixes the height to the specified number of pixels.
     * @property {number|string} [left] - Shifts the list left by the specified number of pixels.
@@ -1318,6 +1335,9 @@
         var autocomplete = new pca.Eventable(this);
 
         autocomplete.options = options || {};
+        autocomplete.options.force = autocomplete.options.force || false;
+        autocomplete.options.allowTab = autocomplete.options.allowTab || false;
+        autocomplete.options.onlyDown = autocomplete.options.onlyDown || false;
         /** The parent HTML element for the autocomplete list. */
         autocomplete.element = pca.create("div", { className: "pcaautocomplete pcatext" });
         autocomplete.anchors = [];
@@ -1333,6 +1353,7 @@
         autocomplete.visible = true;
         autocomplete.hover = false;
         autocomplete.focused = false;
+        autocomplete.upwards = false;
         autocomplete.controlDown = false;
         /** The disabled state of the autocomplete list. 
         * @type {boolean} */
@@ -1435,8 +1456,8 @@
             else
                 autocomplete.attach(pca.getElement(fields));
 
-            pca.listen(autocomplete.element, "mouseover", function () { autocomplete.hover = true });
-            pca.listen(autocomplete.element, "mouseout", function () { autocomplete.hover = false });
+            pca.listen(autocomplete.element, "mouseover", function () { autocomplete.hover = true; });
+            pca.listen(autocomplete.element, "mouseout", function () { autocomplete.hover = false; });
             pca.listen(document, "click", autocomplete.checkHide);
             pca.listen(window, "resize", autocomplete.resize);
 
@@ -1542,8 +1563,14 @@
                 windowScroll = pca.getScroll(window),
                 fixed = !isPage(topParent);
 
+            //check where there is space to open the list
+            var hasSpaceBelow = (fieldPosition.top + listSize.height - (fixed ? 0 : windowScroll.top)) < windowSize.height,
+                hasSpaceAbove = (fieldPosition.top - (fixed ? 0 : windowScroll.top)) > listSize.height;
+
             //should the popup open upwards
-            if ((fieldPosition.top - (fixed ? 0 : windowScroll.top)) > listSize.height && (fieldPosition.top + listSize.height - (fixed ? 0 : windowScroll.top)) > windowSize.height) {
+            autocomplete.upwards = !hasSpaceBelow && hasSpaceAbove && !autocomplete.options.onlyDown;
+
+            if (autocomplete.upwards) {
                 if (autocomplete.options.force) {
                     autocomplete.element.style.top = -(listSize.height + fieldSize.height + 2) + "px";
                 }
@@ -1564,12 +1591,20 @@
             if (autocomplete.options.left) autocomplete.element.style.left = (parseInt(autocomplete.element.style.left) + parseInt(autocomplete.options.left)) + "px";
             if (autocomplete.options.top) autocomplete.element.style.top = (parseInt(autocomplete.element.style.top) + parseInt(autocomplete.options.top)) + "px";
 
-            //set minimum width for field
-            if (!autocomplete.fixedWidth) {
-                var ownBorderWidth = (parseInt(pca.getStyle(autocomplete.element, "borderLeftWidth")) + parseInt(pca.getStyle(autocomplete.element, "borderRightWidth"))) || 0;
-                autocomplete.element.style.minWidth = Math.max((pca.getSize(field).width - ownBorderWidth), 0) + "px";
-            }
+            var ownBorderWidth = (parseInt(pca.getStyle(autocomplete.element, "borderLeftWidth")) + parseInt(pca.getStyle(autocomplete.element, "borderRightWidth"))) || 0,
+                preferredWidth = Math.max((pca.getSize(field).width - ownBorderWidth), 0);
 
+            //set minimum width for field
+            if (!autocomplete.fixedWidth)
+                autocomplete.element.style.minWidth = preferredWidth + "px";
+
+            //fix the size when there is no support for minimum width
+            if ((document.documentMode && document.documentMode <= 7) || /\bMSIE (7|6)/.test(pca.agent)) {
+                autocomplete.setWidth(Math.max(preferredWidth, 280));
+                autocomplete.element.style.left = ((parseInt(autocomplete.element.style.left) || 0) - 2) + "px";
+                autocomplete.element.style.top = ((parseInt(autocomplete.element.style.top) || 0) - 2) + "px";
+            }
+ 
             autocomplete.positionField = field;
             autocomplete.fire("move");
 
@@ -1726,6 +1761,9 @@
 
             if (key == 17)
                 autocomplete.controlDown = true;
+
+            if (key == 9 && autocomplete.options.allowTab)
+                pca.smash(event);
         }
 
         //keyup event handler
@@ -2763,7 +2801,7 @@
         pca.styleFixes = [];
 
         for (var i = 0; i < fixesList.length; i++)
-            pca.applyStyleFixes(fixesList[i].selectorText, fixesList[i].fixes)
+            pca.applyStyleFixes(fixesList[i].selectorText, fixesList[i].fixes);
     }
 
     /** Creates a style sheet from cssText.
@@ -2860,12 +2898,11 @@
         e.preventDefault ? e.preventDefault() : e.returnValue = false;
     }
 
-    /** Debug messages. Add a div with an id of "pcadebug" or use the console. 
+    /** Debug messages to the console. 
     * @memberof pca 
     * @param {string} message - The debug message text. */
     pca.debug = function (message) {
         if (typeof console != "undefined" && console.debug) console.debug(message);
-        pca.setValue(document.getElementById("pcadebug"), message);
     }
 
     checkDocumentLoad();
@@ -3483,7 +3520,8 @@
             COUNTRYSELECT: "Select Country",
             NOLOCATION: "Sorry, we could not get your location",
             NOCOUNTRY: "Sorry, we could not find this country",
-            MANUALENTRY: "I cannot find my address. Let me type it in"
+            MANUALENTRY: "I cannot find my address. Let me type it in",
+            RESULTCOUNT: "<b>{count}</b> matching results"
         },
         "cy": {
             DIDYOUMEAN: "A oeddech yn meddwl:",
@@ -3494,7 +3532,8 @@
             COUNTRYSELECT: "Dewiswch gwlad",
             NOLOCATION: "Mae'n ddrwg gennym, nid oeddem yn gallu cael eich lleoliad",
             NOCOUNTRY: "Mae'n ddrwg gennym, ni allem ddod o hyd y wlad hon",
-            MANUALENTRY: "Ni allaf ddod o hyd i fy nghyfeiriad. Gadewch i mi deipio mewn"
+            MANUALENTRY: "Ni allaf ddod o hyd i fy nghyfeiriad. Gadewch i mi deipio mewn",
+            RESULTCOUNT: "<b>{count}</b> Canlyniadau paru"
         },
         "fr": {
             DIDYOUMEAN: "Vouliez-vous dire:",
@@ -3505,7 +3544,8 @@
             COUNTRYSELECT: "Changer de pays",
             NOLOCATION: "Désolé, nous n'avons pas pu obtenir votre emplacement",
             NOCOUNTRY: "Désolé, nous n'avons pas trouvé ce pays",
-            MANUALENTRY: "Je ne peux pas trouver mon adresse. Permettez-moi de taper dans"
+            MANUALENTRY: "Je ne peux pas trouver mon adresse. Permettez-moi de taper dans",
+            RESULTCOUNT: "<b>{count}</b> résultats correspondants"
         },
         "de": {
             DIDYOUMEAN: "Meinten Sie:",
@@ -3516,7 +3556,8 @@
             COUNTRYSELECT: "Land wechseln",
             NOLOCATION: "Leider konnten wir nicht bekommen, Ihren Standort",
             NOCOUNTRY: "Leider konnten wir nicht finden, dieses Land",
-            MANUALENTRY: "Ich kann meine Adresse nicht finden. Lassen Sie mich geben Sie es in"
+            MANUALENTRY: "Ich kann meine Adresse nicht finden. Lassen Sie mich geben Sie es in",
+            RESULTCOUNT: "<b>{count}</b> passenden Ergebnisse"
         }
     };
 
@@ -3614,13 +3655,17 @@
     * @property {boolean} [populate=true] - Used to enable or disable population of all fields.
     * @property {boolean} [onlyInputs=false] - Only input fields will be populated.
     * @property {boolean} [autoSearch=false] - Search will be triggered on field focus.
+    * @property {boolean} [preselect=true] - Automatically highlight the first item in the list.
     * @property {boolean} [prompt=false] - Shows a message to prompt the user for more detail.
     * @property {number} [promptDelay=0] - The time in milliseconds before the control will prompt the user for more detail.
+    * @property {boolean} [inlineMessages=false] - Shows messages within the list rather than above the search field.
     * @property {boolean} [setCursor=false] - Updates the input field with the current search text.
+    * @property {boolean} [matchCount=false] - Shows the number of possible matches while searching.
     * @property {number} [minSearch=1] - Search will be triggered on field focus.
-    * @property {number} [minItems=7] - The minimum number of items to show in the list.
+    * @property {number} [minItems=1] - The minimum number of items to show in the list.
     * @property {number} [maxItems=7] - The maximum number of items to show in the list.
     * @property {boolean} [manualEntry=false] - If no results are found, the message can be clicked to disable the control.
+    * @property {boolean} [manualEntryItem=false] - Adds an item to the bottom of the list which enables manual address entry.
     * @property {number} [disableTime=60000] - The time in milliseconds to disable the control for manual entry.
     * @property {boolean} [suppressAutocomplete=true] - Suppress the default browser field autocomplete on search fields.
     * @property {boolean} [setCountryByIP=false] - Automatically set the country based upon the user IP address.
@@ -3660,11 +3705,13 @@
         address.options.populate = typeof address.options.populate == 'boolean' ? address.options.populate : true;
         address.options.onlyInputs = typeof address.options.onlyInputs == 'boolean' ? address.options.onlyInputs : false;
         address.options.autoSearch = typeof address.options.autoSearch == 'boolean' ? address.options.autoSearch : false;
+        address.options.preselect = typeof address.options.preselect == 'boolean' ? address.options.preselect : true;
         address.options.minSearch = address.options.minSearch || 1;
+        address.options.minItems = address.options.minItems || 1;
         address.options.maxItems = address.options.maxItems || 7;
-        address.options.minItems = address.options.minItems || 7;
         address.options.advancedFields = address.options.advancedFields || [];
-        address.options.manualEntry = address.options.manualEntry || false;
+        address.options.manualEntry = typeof address.options.manualEntry == 'boolean' ? address.options.manualEntry : false;
+        address.options.manualEntryItem = typeof address.options.manualEntryItem == 'boolean' ? address.options.manualEntryItem : false;
         address.options.disableTime = address.options.disableTime || 60000;
         address.options.suppressAutocomplete = typeof address.options.suppressAutocomplete == 'boolean' ? address.options.suppressAutocomplete : true;
         address.options.setCountryByIP = typeof address.options.setCountryByIP == 'boolean' ? address.options.setCountryByIP : false;
@@ -3674,7 +3721,9 @@
         address.options.culture = address.options.culture || "en-GB";
         address.options.prompt = typeof address.options.prompt == 'boolean' ? address.options.prompt : false;
         address.options.promptDelay = address.options.promptDelay || 0;
+        address.options.inlineMessages = typeof address.options.inlineMessages == 'boolean' ? address.options.inlineMessages : false;
         address.options.setCursor = typeof address.options.setCursor == 'boolean' ? address.options.setCursor : false;
+        address.options.matchCount = typeof address.options.matchCount == 'boolean' ? address.options.matchCount : false;
         address.options.languagePreference = address.options.languagePreference || "";
         address.options.filteringMode = address.options.filteringMode || pca.filteringMode.EVERYTHING;
         address.options.orderingMode = address.options.orderingMode || pca.orderingMode.DEFAULT;
@@ -3702,6 +3751,7 @@
         address.initialSearch = false; //when this has been done the list will filter
         address.searchContext = null; //stored when filtering to aid searching
         address.lastActionTimer = null; //the time of the last user interaction with the control
+        address.notifcationTimer = null; //the time to show a notification for
         address.storedSearch = null; //stored value from search when country is switched
         address.geolocation = null; //users current geolocation when searching by location
         address.loaded = false; //current state of the control
@@ -3715,6 +3765,7 @@
         /** The country list
         * @type {pca.CountryList} */
         address.countrylist = null;
+        address.messageBox = null;
 
         /** Initialise the control. 
         * @fires load */
@@ -3826,7 +3877,8 @@
 
             //preselect the first country in the list
             address.countrylist.autocomplete.listen("filter", function () {
-                address.countrylist.autocomplete.list.first();
+                if (address.options.preselect)
+                    address.countrylist.autocomplete.list.first();
             });
 
             //pass through the show event
@@ -3852,7 +3904,7 @@
             //create a flag icon and add to the footer of the search list
             var flagbutton = pca.create("div", { className: "pcaflagbutton" }),
                 flag = address.countrylist.flag();
-            flagbutton.appendChild(flag)
+            flagbutton.appendChild(flag);
             address.autocomplete.footer.setContent(address.options.bar.showCountry ? flagbutton : "");
 
             //clicking the flag button will show the country list
@@ -3861,7 +3913,7 @@
             //create another flag icon on the country list to close it
             var countryFlagbutton = pca.create("div", { className: "pcaflagbutton" }),
                 countryFlag = address.countrylist.flag();
-            countryFlagbutton.appendChild(countryFlag)
+            countryFlagbutton.appendChild(countryFlag);
             address.countrylist.autocomplete.footer.setContent(address.options.bar.showCountry ? countryFlagbutton : "");
 
             //clicking the flag button will hide the country list
@@ -3905,6 +3957,10 @@
             if (address.options.bar.visible)
                 address.countrylist.autocomplete.footer.show();
 
+            //add an item for manual entry
+            if (address.options.manualEntryItem)
+                address.addManualEntryItem();
+
             //get the users country by IP
             if (address.options.setCountryByIP) address.setCountryByIP();
             
@@ -3918,6 +3974,10 @@
                 pca.setAttributes(countryMessage, { id: countrylistname + "_label" });
                 pca.setAttributes(countryFlagbutton, { id: countrylistname + "_button", role: "button", "aria-labelledby": countrylistname + "_label" });
             }
+
+            //create the hovering message box
+            address.messageBox = pca.create("div", { className: "pcatext pcanotification" });
+            pca.append(address.messageBox, pca.container);
 
             //control load finished
             address.loaded = true;
@@ -3947,7 +4007,8 @@
             }  
 
             //if the last result is still being used, then filter from the id            
-            var lastId = address.searchContext ? (address.searchContext.id || "") : "";
+            var lastId = address.searchContext ? (address.searchContext.id || "") : "",
+                search = { searchTerm: term, lastId: lastId };
 
             function success(items, response) {
                 if (items.length)
@@ -3956,10 +4017,10 @@
                     noResultsMessage();
             }
 
-            address.fire("search", term);
+            address.fire("search", search);
 
-            if (term)
-                pca.fetch(address.options.provider + "/Interactive/Find/v2.00", { Key: address.key, Country: address.country, SearchTerm: term, LanguagePreference: address.language, LastId: lastId, SearchFor: address.filteringMode, OrderBy: address.orderingMode, $block: true, $cache: true }, success, address.error);
+            if (search.searchTerm)
+                pca.fetch(address.options.provider + "/Interactive/Find/v2.10", { Key: address.key, Country: address.country, SearchTerm: search.searchTerm, LanguagePreference: address.language, LastId: search.lastId, SearchFor: address.filteringMode, OrderBy: address.orderingMode, $block: true, $cache: true }, success, address.error);
 
             return address;
         }
@@ -4029,7 +4090,7 @@
             for (var i = 0; i < address.advancedFields.length; i++)
                 params["field" + (i + 1) + "format"] = address.advancedFields[i];
 
-            pca.fetch(address.options.provider + "/Interactive/RetrieveFormatted/v2.00", params, success, address.error);
+            pca.fetch(address.options.provider + "/Interactive/RetrieveFormatted/v2.10", params, success, address.error);
         }
 
         /** Handles an error from the service. 
@@ -4038,6 +4099,8 @@
         * @throws The error. */
         address.error = function (message) {
             address.fire("error", message);
+
+            pca.clearBlockingRequests();
 
             //if the error message is not handled throw it
             if (!address.listeners["error"])
@@ -4062,8 +4125,15 @@
             address.highlight(results);
             address.fire("results", results, attributes);
             address.autocomplete.clear().add(results, template, address.select).show();
-            address.autocomplete.list.first();
             address.showFooterLogo();
+
+            //add expandable class
+            address.autocomplete.list.collection.all(function(item) {
+                if (item.data && item.data.Next && item.data.Next == "Find") pca.addClass(item.element, "pcaexpandable");
+            });
+
+            if (address.options.preselect)
+                address.autocomplete.list.first();
 
             //prompt the user for more detail
             if (address.options.prompt) {
@@ -4077,31 +4147,85 @@
                     address.lastActionTimer = window.setTimeout(showPromptMessage, address.options.promptDelay);
                 else showPromptMessage();
             }
-                
+
+            //show the number of matching results
+            if (address.options.matchCount && attributes && attributes.ContainerCount)
+                resultCountMessage(attributes.ContainerCount);
+
             address.fire("display", results, attributes);
             return address;
         }
 
+        /**
+        * Message options.
+        * @typedef {Object} pca.Address.MessageOptions
+        * @property {number} [notificationTimeout] - The time in ms to show the notification for.
+        * @property {boolean} [inline] - Show messages in the header of the list.
+        * @property {boolean} [clearList] - Clears the list of results when showing this message.
+        * @property {boolean} [clickToDisable] - Clicking the message will hide and disable the control.
+        * @property {boolean} [error] - Apply the style class for an error message.
+        */
+
         /** Shows a message in the autocomplete. 
         * @param {string} text - The message to show. 
-        * @param {boolean} clearList - Clear the items in the list when showing the message. */
-        address.message = function (text, clearList) {
+        * @param {pca.Address.MessageOptions} messageOptions - Options for the message. */
+        address.message = function (text, messageOptions) {
+            messageOptions = messageOptions || {};
+            messageOptions.notificationTimeout = messageOptions.notificationTimeout || 3000;
+            messageOptions.inline = messageOptions.inline || address.options.inlineMessages;
+
             clearPromptTimer();
-            address.autocomplete.show();
-            address.autocomplete.header.clear().setText(text).show();
-            if (clearList) address.autocomplete.clear().list.hide();
-            address.reposition();
+
+            if (messageOptions.inline) {
+                address.autocomplete.show();
+
+                if (messageOptions.clickToDisable)
+                    address.autocomplete.header.clear().setContent(pca.create("div", { className: "pcamessage", innerHTML: text, onclick: address.manualEntry }, "cursor:pointer;")).show();
+                else
+                    address.autocomplete.header.clear().setText(text).show();
+
+                address.reposition();
+            }
+            else {
+                address.messageBox.innerHTML = text;
+                pca.addClass(address.messageBox, "pcavisible");
+
+                pca.removeClass(address.messageBox, "pcaerror");
+                if (messageOptions.error) pca.addClass(address.messageBox, "pcaerror");
+
+                if (address.notifcationTimer) window.clearTimeout(address.notifcationTimer);
+                pca.removeClass(address.messageBox, "pcafade");
+                address.notifcationTimer = window.setTimeout(function() {
+                    pca.addClass(address.messageBox, "pcafade");
+                    window.setTimeout(function() {
+                        pca.removeClass(address.messageBox, "pcavisible");
+                    }, 500);
+                }, messageOptions.notificationTimeout);
+
+                var fieldPosition = pca.getPosition(address.autocomplete.field),
+                    fieldSize = pca.getSize(address.autocomplete.field),
+                    messageSize = pca.getSize(address.messageBox);
+
+                address.messageBox.style.top = (address.autocomplete.upwards ? fieldPosition.top + fieldSize.height + 8 : fieldPosition.top - messageSize.height - 8) + "px";
+                address.messageBox.style.left = fieldPosition.left + "px";
+            }
+
+            if (messageOptions.clearList)
+                address.autocomplete.clear().list.hide();
+
             return address;
         }
 
         // Show the no results message which can be clicked to disable searching.
         function noResultsMessage() {
             address.reset();
-            address.autocomplete.show();
-            address.autocomplete.header.clear().setContent(pca.create("div", { className: "pcamessage", innerHTML: pca.messages[address.language].NORESULTS, onclick: address.options.manualEntry ? address.manualEntry : function () {} }, address.options.manualEntry ? "cursor:pointer;": "")).show();
-            address.showFooterMessage();
-            address.autocomplete.clear().list.hide();
+            address.message(pca.messages[address.language].NORESULTS, { clickToDisable: address.options.manualEntry, error: true, clearList: true });
             address.fire("noresults");
+        }
+
+        // Show the number of results possible
+        function resultCountMessage(count) {
+            address.message(pca.formatLine({ count: count }, pca.messages[address.language].RESULTCOUNT));
         }
 
         /** Sets the value of current input field to prompt the user.

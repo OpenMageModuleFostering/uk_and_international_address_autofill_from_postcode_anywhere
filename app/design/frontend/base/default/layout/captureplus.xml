@@ -51,4 +51,11 @@
             <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
         </reference>
     </opc_index_index>
+
+    <!-- Support for Fire Checkout -->
+    <firecheckout_index_index>
+      <reference name="head">
+        <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
+      </reference>
+    </firecheckout_index_index>
 </layout>

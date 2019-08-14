@@ -11,8 +11,8 @@ class PostcodeAnywhere_CapturePlus_Block_ScriptInclude extends Mage_Core_Block_T
 		 */
         $head = $this->getLayout()->getBlock('head');
         if ($head) {
-    		$head->addCss('captureplus/address-3.30.min.css');
-            $head->addJs('captureplus/address-3.30.min.js');
+    		$head->addCss('captureplus/address-3.40.min.css');
+            $head->addJs('captureplus/address-3.40.min.js');
         }
     }
 }

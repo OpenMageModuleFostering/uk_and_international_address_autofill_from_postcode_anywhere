@@ -79,4 +79,11 @@
       <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
     </reference>
   </lotusbreath_onestepcheckout_index_index>
+
+  <!-- Support for GoMage LightCheckout -->
+  <gomage_checkout_onepage_index>
+    <reference name="head">
+      <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
+    </reference>
+  </gomage_checkout_onepage_index>
 </layout>

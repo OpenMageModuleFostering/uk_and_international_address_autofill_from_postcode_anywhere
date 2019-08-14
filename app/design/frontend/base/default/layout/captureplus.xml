@@ -86,4 +86,11 @@
       <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
     </reference>
   </gomage_checkout_onepage_index>
+
+  <!-- Support for Good Checkout -->
+  <goodcheckout_index_index>
+    <reference name="head">
+      <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
+    </reference>
+  </goodcheckout_index_index>
 </layout>

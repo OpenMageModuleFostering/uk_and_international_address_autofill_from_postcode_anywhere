@@ -58,4 +58,11 @@
         <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
       </reference>
     </firecheckout_index_index>
+
+    <!-- Support for AW One Step Checkout -->
+    <aw_onestepcheckout_index_index>
+      <reference name="head">
+        <block type="captureplus/scriptinclude" name="captureplus_scriptinclude"  template="captureplus/scriptinclude.phtml" />
+      </reference>
+    </aw_onestepcheckout_index_index>
 </layout>

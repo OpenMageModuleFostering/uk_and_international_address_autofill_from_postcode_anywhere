@@ -72,8 +72,11 @@
               
               //fire the change event for all address fields. This helps with some AJAX functionality
               control.listen("populate", function() {
-                  for (var i in addressFields)
-                    pca.fire(pca.getElement(addressFields[i]), "change");
+                  for (var i in addressFields) {
+                      if (addressFields[i] == addressFields.CountrySelect) continue; //no not fire event for country, it will cause postback
+                      
+                      pca.fire(pca.getElement(addressFields[i]), "change");
+                  }
               });
               
               //Custom code from Settings
@@ -115,23 +118,20 @@
                   }
               }
               
-              var activeItemIndex = 1;
-              
-              if (customerAddresses.activeItem && customerAddresses.activeItem.id)
-                  activeItemIndex = parseInt(/\d+$/.exec(customerAddresses.activeItem.id));
-              
-              //launch for existing addresses
-              for (var i = 1; i <= (activeItemIndex + customerAddresses.itemCount); i++) {
-                  if (pca.getElement("_item" + i + "street0")) {
+              //load up existing customer addresses
+              for (var i = 0; i < customerAddresses.formContainer.children.length; i++) {
+                  var addressIndex = parseInt(/\d+$/.exec(customerAddresses.formContainer.children[i].id));
+                  
+                  if (pca.getElement("_item" + addressIndex + "street0")) {
                       createAddressControl({
-                          Company: "_item" + i + "company",
-                          Line1: "_item" + i + "street0",
-                          Line2: "_item" + i + "street1",
-                          City: "_item" + i + "city",
-                          State: "_item" + i + "region",
-                          StateSelect: "_item" + i + "region_id",
-                          Postcode: "_item" + i + "postcode",
-                          CountrySelect: "_item" + i + "country_id"
+                          Company: "_item" + addressIndex + "company",
+                          Line1: "_item" + addressIndex + "street0",
+                          Line2: "_item" + addressIndex + "street1",
+                          City: "_item" + addressIndex + "city",
+                          State: "_item" + addressIndex + "region",
+                          StateSelect: "_item" + addressIndex + "region_id",
+                          Postcode: "_item" + addressIndex + "postcode",
+                          CountrySelect: "_item" + addressIndex + "country_id"
                       });
                   }
               }

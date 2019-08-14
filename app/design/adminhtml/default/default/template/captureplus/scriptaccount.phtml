@@ -50,7 +50,7 @@ pca.ready(function () {
             modal.addHalfFields("Name", { value: "", placeholder: "First" }, { value: "", placeholder: "Last" });
             modal.addField("Company", { value: "" });
             modal.addField("Phone", { value: "", type: "tel" });
-            modal.addField("Email", { value: "", type: "email", required: true, id:"omg" });
+            modal.addField("Email", { value: "", type: "email", required: true });
             modal.addHalfFields("Password", { type: "password", required: true }, { type: "password", required: true, placeholder: "Repeat password" });
             modal.addButton("Register", register);
             modal.addButton("Skip", modal.hide, true);

@@ -84,6 +84,13 @@
                         control.setCountryByIP();
                 }
 
+                for (var i = 0; i < fields.length; i++) {
+                    var field = pca.getElement(fields[i].element);
+                        
+                    if (field)
+                        field.autocomplete = "off";
+                }
+
                 pca.listen(countryField, "change", getCountry);
                 getCountry();
             }

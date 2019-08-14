@@ -114,9 +114,14 @@
                       });
                   }
               }
-                
+              
+              var activeItemIndex = 1;
+              
+              if (customerAddresses.activeItem && customerAddresses.activeItem.id)
+                  activeItemIndex = parseInt(customerAddresses.activeItem.id[customerAddresses.activeItem.id.length - 1]);
+              
               //launch for existing addresses
-              for (var i = 1; i <= customerAddresses.itemCount; i++) {
+              for (var i = 1; i <= (activeItemIndex + customerAddresses.itemCount); i++) {
                   if (pca.getElement("_item" + i + "street0")) {
                       createAddressControl({
                           Company: "_item" + i + "company",

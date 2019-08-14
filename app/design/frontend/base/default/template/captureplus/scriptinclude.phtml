@@ -83,6 +83,9 @@
               magento.controls.push(control);
           }
           
+          //do not load if there is no key
+          if (!magento.key) return;
+          
           //check for address forms on the page
           for (var i = 0; i < magento.fields.length; i++) {
               if (pca.getElement(magento.fields[i].Line1))

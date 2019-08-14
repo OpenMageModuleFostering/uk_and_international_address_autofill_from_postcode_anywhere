@@ -3,7 +3,7 @@
 * Address v3.00
 * Component for address lookup integrations.
 *
-* WEB-1-3 26/03/2013 10:54:05
+* WEB-1-3 15/04/2013 08:43:09
 */
 
 (function (window, undefined) {
@@ -267,8 +267,41 @@
             processRequest(pca.requests[pca.requestQueue.shift()]);
     }
 
-    ///<summary>Makes a service request using a script GET method.</summary>
+    ///<summary>Makes a GET request using best method availble.</summary>
+    ///<remarks>Security must be bypassed in Internet Explorer up to version 10.</remarks>
     function getRequest(request) {
+        navigator.appName == 'Microsoft Internet Explorer' ? getRequestScript(request) : getRequestXHR(request);
+    }
+
+    ///<summary>Makes a service request using a XMLHttpRequest GET method.</summary>
+    function getRequestXHR(request) {
+        var xhr = new XMLHttpRequest(),
+            url = pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint,
+            query = "";
+
+        for (var i in request.data)
+            query += (query ? "&" : "?") + i + "=" + encodeURIComponent(request.data[i]);
+
+        url += query;
+
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4)
+                request.callback(pca.parseJSON(xhr.responseText));
+        }
+
+        //if the src length is long and likely to cause problems with url limits we should make a POST request
+        if (url.length > pca.limit) {
+            request.post = true;
+            postRequest(request);
+        }
+        else {
+            xhr.open("GET", url, true);
+            xhr.send();
+        }
+    }
+
+    ///<summary>Makes a service request using a script GET method.</summary>
+    function getRequestScript(request) {
         var script = pca.create("script", { type: "text/javascript", async: "async" }),
             head = document.getElementsByTagName("head")[0],
             url = pca.protocol + "//" + pca.host + "/" + request.service + "/" + pca.endpoint,
@@ -297,7 +330,8 @@
             head.insertBefore(script, head.firstChild);
     }
 
-    ///<summary>Makes a post request using best method availble.</summary>
+    ///<summary>Makes a POST request using best method availble.</summary>
+    ///<remarks>Security must be bypassed in Internet Explorer up to version 10.</remarks>
     function postRequest(request) {
         navigator.appName == 'Microsoft Internet Explorer' ? postRequestForm(request) : postRequestXHR(request);
     }
@@ -1063,6 +1097,7 @@
             return autocomplete;
         }
 
+        ///<summary>Shows the autocomplete.</summary>
         autocomplete.show = function () {
             if (!autocomplete.disabled) {
                 autocomplete.visible = true;
@@ -1075,11 +1110,13 @@
             return autocomplete;
         }
 
+        ///<summary>Shows the autocomplete and all items without a filter.</summary>
         autocomplete.showAll = function () {
             autocomplete.list.filter("");
             autocomplete.show();
         }
 
+        ///<summary>Hides the autocomplete.</summary>
         autocomplete.hide = function () {
             autocomplete.visible = false;
             autocomplete.element.style.display = "none";
@@ -1120,7 +1157,7 @@
                 autocomplete.filter();
                 autocomplete.fire("delete");
             }
-            else if (key <= 46) { //non-character key
+            else if (key != 0 && key <= 46) { //recognised non-character key
                 if (autocomplete.visible && autocomplete.list.navigate(key))
                     pca.smash(event); //keys handled by the list, stop other events
                 else if (key == 38 || key == 40) //up or down when list is hidden
@@ -1149,31 +1186,41 @@
             autocomplete.fire("dblclick");
         }
 
+        ///<summary>Add items to the autocomplete list.</summary>
+        ///<param name="array">An array of objects to add.</param>
+        ///<param name="format">A format string to display items.</param>
+        ///<param name="callback">A callback function for item select.</param>
         autocomplete.add = function (array, format, callback) {
             autocomplete.list.add(array, format, callback);
 
             return autocomplete;
         }
 
+        ///<summary>Clears the autocomplete list.</summary>
         autocomplete.clear = function () {
             autocomplete.list.clear();
-            autocomplete.hide();
 
             return autocomplete;
         }
 
+        ///<summary>Sets the scroll position of the autocomplete list.</summary>
         autocomplete.setScroll = function (position) {
             autocomplete.list.setScroll(position);
 
             return autocomplete;
         }
 
+        ///<summary>Sets the width of the autocomplete list.</summary>
         autocomplete.setWidth = function (width) {
             autocomplete.element.style.width = width + "px";
 
             return autocomplete;
         }
 
+        ///<summary>Filters the autocomplete list for items matching the supplied term.</summary>
+        ///<param name="term">The term to search for
+        ///<remarks>Case insensitive</remarks>
+        ///</param>
         autocomplete.filter = function (term) {
             autocomplete.list.filter(term || pca.getValue(autocomplete.field));
             autocomplete.list.collection.count ? autocomplete.show() : autocomplete.hide();
@@ -1971,8 +2018,10 @@
                 countrylist.autocomplete.clear();
 
                 for (var i = 0; i < codesSplit.length; i++) {
+                    var code = codesSplit[i].toString().toUpperCase();
+
                     for (var c = 0; c < countrylist.countries.length; c++) {
-                        if (countrylist.countries[c].iso2 == codesSplit[i] || countrylist.countries[c].iso3 == codesSplit[i]) {
+                        if (countrylist.countries[c].iso2 == code || countrylist.countries[c].iso3 == code) {
                             filteredList.push(countrylist.countries[c]);
                             break;
                         }
@@ -2016,25 +2065,27 @@
 
         ///<summary>Finds a matching country from a name or code.</summary>
         countrylist.find = function (country) {
+            country = country.toString().toUpperCase();
+
+            function isAlternate(item) {
+                if (item.data.alternates) {
+                    for (var a = 0; a < item.data.alternates.length; a++) {
+                        if (item.data.alternates[a].toUpperCase() == country)
+                            return true;
+                    }
+                }
+
+                return false;
+            }
+
             return (countrylist.autocomplete.list.collection.first(function (item) {
-                return item.data.iso2 == country || item.data.iso3 == country || item.data.name == country || isAlternate(item, country);
+                return item.data.iso2.toUpperCase() == country || item.data.iso3.toUpperCase() == country || item.data.name.toUpperCase() == country || isAlternate(item);
             }) || {}).data;
         }
 
         ///<summary>Returns the first country in the list.</summary>
         countrylist.first = function () {
             return countrylist.autocomplete.list.collection.first().data;
-        }
-
-        function isAlternate(item, country) {
-            if (item.alternates) {
-                for (var a = 0; a < item.alternates.length; a++) {
-                    if (item.alternates[a] == country)
-                        return true;
-                }
-            }
-
-            return false;
         }
 
         countrylist.change = function (country) {
@@ -2107,7 +2158,8 @@
             NORESULTS: "Sorry, no results were found",
             NOADDRESS: "Sorry, we could not find this address",
             SERVICEERROR: "Service Error:",
-            COUNTRYSELECT: "Country Select"
+            COUNTRYSELECT: "Country Select",
+            NOLOCATION: "Sorry, we could not get your location"
         };
 
         address.templates = {
@@ -2129,6 +2181,8 @@
 
         address.autocomplete = null;
         address.countrylist = null;
+
+        address.location = null;
 
         address.load = function () {
             var searchFields = [],
@@ -2162,7 +2216,7 @@
 
             //listen for the user typing something
             address.autocomplete.listen("keyup", function (key) {
-                if (key == 8 || key > 36) searchField();
+                if (key == 0 || key == 8 || key > 36) searchField();
             });
 
             //show just the bar when a field gets focus
@@ -2267,13 +2321,51 @@
                 if (response.length)
                     address.showresults(response, address.templates.AUTOCOMPLETE);
                 else
-                    address.noresults();
+                    address.message(address.messages.NOADDRESS);
             }
 
             address.fire("search", term);
 
             if (term)
                 pca.fetch("CapturePlus/Interactive/AutoComplete/v2.00", { Key: address.key, Country: address.countryCode, SearchTerm: term, $block: true, $cache: true }, success, address.error);
+        }
+
+        ///<summary>Searches using the current browser/devices location.</summary>
+        ///<remarks>Only supported in HTML5.</remarks>
+        address.searchByLocation = function () {
+
+            function gotLocation(response) {
+                if (response && response.coords) {
+                    var location = response.coords.latitude + "," + response.coords.longitude,
+                        accuracy = response.coords.accuracy;
+
+                    address.location = response.coords;
+                    pca.debug(location + "|" + accuracy);
+
+                    pca.fetch("CapturePlus/Interactive/AutoComplete/v2.00", { Key: address.key, Location: location, LocationAccuracy: accuracy, $block: true, $cache: true }, success, address.error);
+                }
+                else
+                    noLocation();
+            }
+
+            function success(response) {
+                if (response.length) {
+                    pca.debug("got results");
+                    address.showresults(response, address.templates.AUTOCOMPLETE);
+                }
+
+                else
+                    address.message(address.messages.NOADDRESS);
+            }
+
+            function noLocation() {
+                address.message(address.messages.NOLOCATION);
+            }
+
+            if (navigator.geolocation)
+                navigator.geolocation.getCurrentPosition(gotLocation, noLocation, { enableHighAccuracy: true });
+            else
+                noLocation();
         }
 
         ///<summary>Looks up a location result when the user selects one.</summary>
@@ -2283,7 +2375,7 @@
                 if (response.length)
                     address.showresults(response, address.templates.AUTOCOMPLETEFIND);
                 else
-                    address.noresults();
+                    address.message(address.messages.NOADDRESS);
             }
 
             pca.fetch("CapturePlus/Interactive/AutoCompleteFind/v2.00", { Key: address.key, Id: id }, success, address.error);
@@ -2312,11 +2404,11 @@
             address.showFooterLogo();
         }
 
-        ///<summary>Show a message when there are no results.</summary>
-        address.noresults = function () {
+        ///<summary>Shows a message in the autocomplete.</summary>
+        address.message = function (text) {
             address.reset();
             address.autocomplete.show();
-            address.autocomplete.header.setText(address.messages.NOADDRESS).show();
+            address.autocomplete.header.setText(text).show();
             address.showFooterMessage();
         }
 

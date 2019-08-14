@@ -3,7 +3,7 @@
  * Address v3.40
  * Component for address lookup integrations.
  *
- * WEB-1-3 10/06/2015 09:56:11
+ * WEB-1-1 11/09/2015 14:31:04
  */
 /** @namespace pca */
 (function (window, undefined) {
@@ -249,7 +249,7 @@
             request.error("Webservice request timed out.");
         }
 
-        request.process = function () {
+        request.process = function() {
             pca.process(request);
         }
 
@@ -266,7 +266,7 @@
     /** Processes a webservice request
     * @memberof pca
     * @param {pca.Request} request - The request to process */
-    pca.process = function (request) {
+    pca.process = function(request) {
         processRequest(request);
     }
 
@@ -411,10 +411,10 @@
             if (xhr.readyState == 4 && xhr.status == 200)
                 request.callback(pca.parseJSON(xhr.responseText));
         }
-
+        
         if (request.credentials)
             xhr.withCredentials = request.credentials;
-
+        
         xhr.onerror = request.serviceError;
         xhr.ontimeout = request.timeoutError;
         xhr.open("POST", request.destination, true);
@@ -464,7 +464,7 @@
     }
 
     /** Clears blocking requests */
-    pca.clearBlockingRequests = function () {
+    pca.clearBlockingRequests = function() {
         pca.waitingRequest = false;
         pca.blockRequests = false;
     }
@@ -563,7 +563,7 @@
 
         /** The user is pressed down on the item.
         * @fires mousedown */
-        item.mousedown = function () {
+        item.mousedown = function() {
             item.fire("mousedown");
         }
 
@@ -960,7 +960,7 @@
             if (list.headerItem)
                 list.element.appendChild(list.headerItem.element);
 
-            list.collection.all(function (item) {
+            list.collection.all(function(item) {
                 list.element.appendChild(item.element);
             });
 
@@ -968,7 +968,7 @@
                 list.element.appendChild(list.footerItem.element);
 
             list.resize();
-            list.fire("draw");
+            list.fire("draw");  
 
             return list;
         }
@@ -1104,7 +1104,7 @@
 
         /** Returns the next item.
         * @returns {pca.Item} The next item. */
-        list.nextItem = function () {
+        list.nextItem = function() {
             if (!list.highlightedItem) return list.firstItem;
 
             if (list.highlightedItem == list.collection.lastVisibleItem && (list.footerItem || list.headerItem))
@@ -1132,7 +1132,7 @@
 
         /** Returns the current item.
         * @returns {pca.Item} The current item. */
-        list.currentItem = function () {
+        list.currentItem = function() {
             return list.highlightedItem;
         }
 
@@ -1233,7 +1233,7 @@
         }
 
         /** Sizes the list based upon the maximum number of items. */
-        list.resize = function () {
+        list.resize = function() {
             var height = list.getHeight();
 
             if (height > 0)
@@ -1276,7 +1276,7 @@
         }
 
         //store the current highlighted item
-        list.collection.listen("highlight", function (item) {
+        list.collection.listen("highlight", function(item) {
             list.highlightedItem = item;
         });
 
@@ -1292,19 +1292,19 @@
 
             list.collection.listen("add", function (additions) {
                 function listenHighlightChange(item) {
-                    item.listen("highlight", function () {
+                    item.listen("highlight", function() {
                         pca.setAttributes(list.element, { "aria-activedescendant": item.id });
                     });
                 }
 
-                for (var i = 0; i < additions.length; i++)
+                for (var i = 0; i < additions.length; i++) 
                     listenHighlightChange(additions[i]);
 
-                list.collection.all(function (item, index) {
+                list.collection.all(function(item, index) {
                     item.element.id = item.id = list.options.name + "_item" + index;
                     pca.setAttributes(item.element, { role: "option" });
                 });
-            });
+            });            
         }
 
         return list;
@@ -1606,7 +1606,7 @@
                 autocomplete.element.style.left = ((parseInt(autocomplete.element.style.left) || 0) - 2) + "px";
                 autocomplete.element.style.top = ((parseInt(autocomplete.element.style.top) || 0) - 2) + "px";
             }
-
+ 
             autocomplete.positionField = field;
             autocomplete.fire("move");
 
@@ -1640,7 +1640,7 @@
 
                 if (autocomplete.field.setSelectionRange) {
                     autocomplete.field.focus();
-                    autocomplete.field.setSelectionRange(position, position);
+                    autocomplete.field.setSelectionRange(position, position);                    
                 }
                 else if (autocomplete.field.createTextRange) {
                     var range = autocomplete.field.createTextRange();
@@ -1785,7 +1785,7 @@
 
         //paste event handler
         autocomplete.paste = function () {
-            window.setTimeout(function () {
+            window.setTimeout(function() {
                 autocomplete.filter();
                 autocomplete.fire("paste");
             }, 0);
@@ -1811,7 +1811,7 @@
 
         /** Handles page resize.
         * @fires change */
-        autocomplete.resize = function () {
+        autocomplete.resize = function() {
             if (autocomplete.visible) autocomplete.reposition();
         }
 
@@ -2109,7 +2109,7 @@
         modal.addButton = function (labelText, callback, floatRight) {
             var button = pca.create("input", { type: "button", value: labelText, className: "pcabutton" });
 
-            callback = callback || function () { };
+            callback = callback || function() {};
 
             //call the callback function with the form details
             function click() {
@@ -2166,7 +2166,7 @@
 
         /** Clears the content and buttons of the modal window.
         * @fires clear */
-        modal.clear = function () {
+        modal.clear = function() {
             while (modal.content.childNodes.length)
                 modal.content.removeChild(modal.content.childNodes[0]);
 
@@ -2558,7 +2558,7 @@
                         if (pca.formatTag(group[r].value) == valueTextMatch) {
                             group[r].checked = true;
                             return;
-                        }
+                        } 
                     }
                 }
                 else
@@ -2605,7 +2605,7 @@
     * @memberof pca 
     * @param {string|HTMLElement} element - The element to check. 
     * @returns {HTMLOptionElement} The current selected item. */
-    pca.getSelectedItem = function (element) {
+    pca.getSelectedItem = function(element) {
         if ((element = pca.getElement(element)) && element.tagName == "SELECT" && element.selectedIndex >= 0)
             return element.options[element.selectedIndex];
 
@@ -2703,8 +2703,8 @@
 
             do {
                 if (isPage(element)) break;
-                x += parseInt(element.scrollLeft);
-                y += parseInt(element.scrollTop);
+                x += parseInt(element.scrollLeft) || 0;
+                y += parseInt(element.scrollTop) || 0;
             } while (element = element.parentNode);
 
             return { left: x, top: y };
@@ -2775,7 +2775,7 @@
     pca.setAttributes = function (element, attributes) {
         if (element = pca.getElement(element)) {
             for (var i in attributes)
-                element.setAttribute(i, attributes[i]);
+                element.setAttribute(i, attributes[i]);            
         }
     }
 
@@ -2939,7 +2939,7 @@
     pca.countries = [
         { iso2: "AF", iso3: "AFG", name: "Afghanistan", name_fr: "Afghanistan", flag: 1 },
         { iso2: "AX", iso3: "ALA", name: "Åland Islands", name_fr: "Åland(les Îles)", flag: 220 },
-        { iso2: "AL", iso3: "ALB", name: "Albania", name_fr: "Albanie", alternates: ["Shqipëria"], flag: 2 },
+        { iso2: "AL", iso3: "ALB", name: "Albania", name_fr: "Albanie", alternates: [ "Shqipëria" ], flag: 2 },
         { iso2: "DZ", iso3: "DZA", name: "Algeria", name_fr: "Algérie", flag: 3 },
         { iso2: "AS", iso3: "ASM", name: "American Samoa", name_fr: "Samoa américaines", flag: 4 },
         { iso2: "AD", iso3: "AND", name: "Andorra", name_fr: "Andorre", flag: 5 },
@@ -2951,25 +2951,25 @@
         { iso2: "AM", iso3: "ARM", name: "Armenia", name_fr: "Arménie", flag: 10 },
         { iso2: "AW", iso3: "ABW", name: "Aruba", name_fr: "Aruba", flag: 11 },
         { iso2: "AU", iso3: "AUS", name: "Australia", name_fr: "Australie", flag: 12 },
-        { iso2: "AT", iso3: "AUT", name: "Austria", name_fr: "Autriche", alternates: ["Österreich"], flag: 13 },
+        { iso2: "AT", iso3: "AUT", name: "Austria", name_fr: "Autriche", alternates: [ "Österreich" ], flag: 13 },
         { iso2: "AZ", iso3: "AZE", name: "Azerbaijan", name_fr: "Azerbaïdjan", flag: 14 },
         { iso2: "BS", iso3: "BHS", name: "Bahamas", name_fr: "Bahamas", flag: 15 },
         { iso2: "BH", iso3: "BHR", name: "Bahrain", name_fr: "Bahreïn", flag: 16 },
         { iso2: "BD", iso3: "BGD", name: "Bangladesh", name_fr: "Bangladesh", flag: 17 },
         { iso2: "BB", iso3: "BRB", name: "Barbados", name_fr: "Barbade", flag: 18 },
         { iso2: "BY", iso3: "BLR", name: "Belarus", name_fr: "Bélarus", flag: 19 },
-        { iso2: "BE", iso3: "BEL", name: "Belgium", name_fr: "Belgique", alternates: ["België"], flag: 20 },
+        { iso2: "BE", iso3: "BEL", name: "Belgium", name_fr: "Belgique", alternates: [ "België" ], flag: 20 },
         { iso2: "BZ", iso3: "BLZ", name: "Belize", name_fr: "Belize", flag: 21 },
         { iso2: "BJ", iso3: "BEN", name: "Benin", name_fr: "Bénin", flag: 22 },
         { iso2: "BM", iso3: "BMU", name: "Bermuda", name_fr: "Bermudes", flag: 23 },
         { iso2: "BT", iso3: "BTN", name: "Bhutan", name_fr: "Bhoutan", flag: 24 },
         { iso2: "BO", iso3: "BOL", name: "Bolivia, Plurinational State of", name_fr: "Bolivie, l'État plurinational de la", flag: 25 },
         { iso2: "BQ", iso3: "BES", name: "Bonaire, Sint Eustatius and Saba", name_fr: "Bonaire, Saint-Eustache et Saba", flag: 0 },
-        { iso2: "BA", iso3: "BIH", name: "Bosnia and Herzegovina", name_fr: "Bosnie-Herzégovine", alternates: ["Bosna i Hercegovina"], flag: 26 },
+        { iso2: "BA", iso3: "BIH", name: "Bosnia and Herzegovina", name_fr: "Bosnie-Herzégovine", alternates: [ "Bosna i Hercegovina" ], flag: 26 },
         { iso2: "BW", iso3: "BWA", name: "Botswana", name_fr: "Botswana", flag: 27 },
         { iso2: "BV", iso3: "BVT", name: "Bouvet Island", name_fr: "Bouvet (l'Île)", flag: 0 },
-        { iso2: "BR", iso3: "BRA", name: "Brazil", name_fr: "Brésil", alternates: ["Brasil"], flag: 28 },
-        { iso2: "IO", iso3: "IOT", name: "British Indian Ocean Territory", name_fr: "Indien (le Territoire britannique de l'océan)", flag: 29 },
+        { iso2: "BR", iso3: "BRA", name: "Brazil", name_fr: "Brésil", alternates: [ "Brasil" ], flag: 28 },
+        { iso2: "IO", iso3: "IOT", name: "British Indian Ocean Territory", name_fr: "Indien (le Territoire britannique de l'océan)", flag: 29 },
         { iso2: "BN", iso3: "BRN", name: "Brunei Darussalam", name_fr: "Brunei", flag: 0 },
         { iso2: "BG", iso3: "BGR", name: "Bulgaria", name_fr: "Bulgarie", flag: 31 },
         { iso2: "BF", iso3: "BFA", name: "Burkina Faso", name_fr: "Burkina Faso", flag: 32 },
@@ -2978,13 +2978,13 @@
         { iso2: "KH", iso3: "KHM", name: "Cambodia", name_fr: "Cambodge", flag: 35 },
         { iso2: "CM", iso3: "CMR", name: "Cameroon", name_fr: "Cameroun", flag: 36 },
         { iso2: "CA", iso3: "CAN", name: "Canada", name_fr: "Canada", flag: 37 },
-        { iso2: "KY", iso3: "CYM", name: "Cayman Islands", name_fr: "Caïmans (les Îles)", flag: 39 },
+        { iso2: "KY", iso3: "CYM", name: "Cayman Islands", name_fr: "Caïmans (les Îles)", flag: 39 },
         { iso2: "CF", iso3: "CAF", name: "Central African Republic", name_fr: "République centrafricaine", flag: 40 },
         { iso2: "TD", iso3: "TCD", name: "Chad", name_fr: "Tchad", flag: 41 },
         { iso2: "CL", iso3: "CHL", name: "Chile", name_fr: "Chili", flag: 42 },
         { iso2: "CN", iso3: "CHN", name: "China", name_fr: "Chine", flag: 43 },
         { iso2: "CX", iso3: "CXR", name: "Christmas Island", name_fr: "Christmas (l'Île)", flag: 0 },
-        { iso2: "CC", iso3: "CCK", name: "Cocos (Keeling) Islands", name_fr: "Cocos (les Îles)/ Keeling (les Îles)", flag: 0 },
+        { iso2: "CC", iso3: "CCK", name: "Cocos (Keeling) Islands", name_fr: "Cocos (les Îles)/ Keeling (les Îles)", flag: 0 },
         { iso2: "CO", iso3: "COL", name: "Colombia", name_fr: "Colombie", flag: 44 },
         { iso2: "KM", iso3: "COM", name: "Comoros", name_fr: "Comores", flag: 45 },
         { iso2: "CG", iso3: "COG", name: "Congo", name_fr: "Congo", flag: 0 },
@@ -2992,26 +2992,26 @@
         { iso2: "CK", iso3: "COK", name: "Cook Islands", name_fr: "Cook (les Îles)", flag: 47 },
         { iso2: "CR", iso3: "CRI", name: "Costa Rica", name_fr: "Costa Rica", flag: 48 },
         { iso2: "CI", iso3: "CIV", name: "Côte d'Ivoire", name_fr: "Côte d'Ivoire", flag: 49 },
-        { iso2: "HR", iso3: "HRV", name: "Croatia", name_fr: "Croatie", alternates: ["Hrvatska"], flag: 50 },
+        { iso2: "HR", iso3: "HRV", name: "Croatia", name_fr: "Croatie", alternates: [ "Hrvatska" ], flag: 50 },
         { iso2: "CU", iso3: "CUB", name: "Cuba", name_fr: "Cuba", flag: 51 },
         { iso2: "CW", iso3: "CUW", name: "Curaçao", name_fr: "Curaçao", flag: 0 },
         { iso2: "CY", iso3: "CYP", name: "Cyprus", name_fr: "Chypre", flag: 52 },
-        { iso2: "CZ", iso3: "CZE", name: "Czech Republic", name_fr: "tchèque (la République)", alternates: ["Ceská republika"], flag: 53 },
+        { iso2: "CZ", iso3: "CZE", name: "Czech Republic", name_fr: "tchèque (la République)", alternates: [ "Ceská republika" ], flag: 53 },
         { iso2: "DK", iso3: "DNK", name: "Denmark", name_fr: "Danemark", flag: 54 },
         { iso2: "DJ", iso3: "DJI", name: "Djibouti", name_fr: "Djibouti", flag: 55 },
         { iso2: "DM", iso3: "DMA", name: "Dominica", name_fr: "Dominique", flag: 56 },
-        { iso2: "DO", iso3: "DOM", name: "Dominican Republic", name_fr: "dominicaine (la République)", flag: 57 },
+        { iso2: "DO", iso3: "DOM", name: "Dominican Republic", name_fr: "dominicaine (la République)", flag: 57 },
         { iso2: "EC", iso3: "ECU", name: "Ecuador", name_fr: "Équateur", flag: 61 },
         { iso2: "EG", iso3: "EGY", name: "Egypt", name_fr: "Égypte", flag: 58 },
         { iso2: "SV", iso3: "SLV", name: "El Salvador", name_fr: "Salvador", flag: 59 },
         { iso2: "GQ", iso3: "GNQ", name: "Equatorial Guinea", name_fr: "Guinée équatoriale", flag: 62 },
         { iso2: "ER", iso3: "ERI", name: "Eritrea", name_fr: "Érythrée", flag: 63 },
-        { iso2: "EE", iso3: "EST", name: "Estonia", name_fr: "Estonie", alternates: ["Eesti"], flag: 64 },
+        { iso2: "EE", iso3: "EST", name: "Estonia", name_fr: "Estonie", alternates: [ "Eesti" ], flag: 64 },
         { iso2: "ET", iso3: "ETH", name: "Ethiopia", name_fr: "Éthiopie", flag: 65 },
         { iso2: "FK", iso3: "FLK", name: "Falkland Islands [Malvinas]", name_fr: "Falkland (les Îles)/Malouines (les Îles)", flag: 66 },
         { iso2: "FO", iso3: "FRO", name: "Faroe Islands", name_fr: "Féroé (les Îles)", flag: 67 },
         { iso2: "FJ", iso3: "FJI", name: "Fiji", name_fr: "Fidji", flag: 68 },
-        { iso2: "FI", iso3: "FIN", name: "Finland", name_fr: "Finlande", alternates: ["Suomi"], flag: 69 },
+        { iso2: "FI", iso3: "FIN", name: "Finland", name_fr: "Finlande", alternates: [ "Suomi" ], flag: 69 },
         { iso2: "FR", iso3: "FRA", name: "France", name_fr: "France", flag: 70 },
         { iso2: "GF", iso3: "GUF", name: "French Guiana", name_fr: "Guyane française ", flag: 0 },
         { iso2: "PF", iso3: "PYF", name: "French Polynesia", name_fr: "Polynésie française", flag: 71 },
@@ -3019,10 +3019,10 @@
         { iso2: "GA", iso3: "GAB", name: "Gabon", name_fr: "Gabon", flag: 72 },
         { iso2: "GM", iso3: "GMB", name: "Gambia", name_fr: "Gambie", flag: 73 },
         { iso2: "GE", iso3: "GEO", name: "Georgia", name_fr: "Géorgie", flag: 74 },
-        { iso2: "DE", iso3: "DEU", name: "Germany", name_fr: "Allemagne", alternates: ["Deutschland"], flag: 75 },
+        { iso2: "DE", iso3: "DEU", name: "Germany", name_fr: "Allemagne", alternates: [ "Deutschland" ], flag: 75 },
         { iso2: "GH", iso3: "GHA", name: "Ghana", name_fr: "Ghana", flag: 76 },
         { iso2: "GI", iso3: "GIB", name: "Gibraltar", name_fr: "Gibraltar", flag: 77 },
-        { iso2: "GR", iso3: "GRC", name: "Greece", name_fr: "Grèce", alternates: ["Hellas"], flag: 79 },
+        { iso2: "GR", iso3: "GRC", name: "Greece", name_fr: "Grèce", alternates: [ "Hellas" ], flag: 79 },
         { iso2: "GL", iso3: "GRL", name: "Greenland", name_fr: "Groenland", flag: 80 },
         { iso2: "GD", iso3: "GRD", name: "Grenada", name_fr: "Grenade", flag: 81 },
         { iso2: "GP", iso3: "GLP", name: "Guadeloupe", name_fr: "Guadeloupe", flag: 0 },
@@ -3037,8 +3037,8 @@
         { iso2: "VA", iso3: "VAT", name: "Holy See [Vatican City State]", name_fr: "Saint-Siège [État de la Cité du Vatican]", flag: 0 },
         { iso2: "HN", iso3: "HND", name: "Honduras", name_fr: "Honduras", flag: 89 },
         { iso2: "HK", iso3: "HKG", name: "Hong Kong", name_fr: "Hong Kong", flag: 90 },
-        { iso2: "HU", iso3: "HUN", name: "Hungary", name_fr: "Hongrie", alternates: ["Magyarország"], flag: 91 },
-        { iso2: "IS", iso3: "ISL", name: "Iceland", name_fr: "Islande", alternates: ["Ísland"], flag: 92 },
+        { iso2: "HU", iso3: "HUN", name: "Hungary", name_fr: "Hongrie", alternates: [ "Magyarország" ], flag: 91 },
+        { iso2: "IS", iso3: "ISL", name: "Iceland", name_fr: "Islande", alternates: [ "Ísland" ], flag: 92 },
         { iso2: "IN", iso3: "IND", name: "India", name_fr: "Inde", flag: 93 },
         { iso2: "ID", iso3: "IDN", name: "Indonesia", name_fr: "Indonésie", flag: 94 },
         { iso2: "IR", iso3: "IRN", name: "Iran (the Islamic Republic of)", name_fr: "Iran (République Islamique d')", flag: 95 },
@@ -3046,7 +3046,7 @@
         { iso2: "IE", iso3: "IRL", name: "Ireland", name_fr: "Irlande", flag: 97 },
         { iso2: "IM", iso3: "IMN", name: "Isle of Man", name_fr: "Île de Man", flag: 98 },
         { iso2: "IL", iso3: "ISR", name: "Israel", name_fr: "Israël", flag: 99 },
-        { iso2: "IT", iso3: "ITA", name: "Italy", name_fr: "Italie", alternates: ["Italia"], flag: 100 },
+        { iso2: "IT", iso3: "ITA", name: "Italy", name_fr: "Italie", alternates: [ "Italia" ], flag: 100 },
         { iso2: "JM", iso3: "JAM", name: "Jamaica", name_fr: "Jamaïque", flag: 101 },
         { iso2: "JP", iso3: "JPN", name: "Japan", name_fr: "Japon", flag: 102 },
         { iso2: "JE", iso3: "JEY", name: "Jersey", name_fr: "Jersey", flag: 103 },
@@ -3054,7 +3054,7 @@
         { iso2: "KZ", iso3: "KAZ", name: "Kazakhstan", name_fr: "Kazakhstan", flag: 105 },
         { iso2: "KE", iso3: "KEN", name: "Kenya", name_fr: "Kenya", flag: 106 },
         { iso2: "KI", iso3: "KIR", name: "Kiribati", name_fr: "Kiribati", flag: 107 },
-        { iso2: "KP", iso3: "PRK", name: "Korea (the Democratic People's Republic of)", name_fr: "Corée (la République populaire démocratique de )", flag: 149 },
+        { iso2: "KP", iso3: "PRK", name: "Korea (the Democratic People's Republic of)", name_fr: "Corée (la République populaire démocratique de )", flag: 149 },
         { iso2: "KR", iso3: "KOR", name: "Korea (the Republic of)", name_fr: "Corée (la République de)", flag: 185 },
         { iso2: "KW", iso3: "KWT", name: "Kuwait", name_fr: "Koweït", flag: 108 },
         { iso2: "KG", iso3: "KGZ", name: "Kyrgyzstan", name_fr: "Kirghizistan", flag: 109 },
@@ -3065,10 +3065,10 @@
         { iso2: "LR", iso3: "LBR", name: "Liberia", name_fr: "Libéria", flag: 113 },
         { iso2: "LY", iso3: "LBY", name: "Libya", name_fr: "Libye", flag: 114 },
         { iso2: "LI", iso3: "LIE", name: "Liechtenstein", name_fr: "Liechtenstein", flag: 115 },
-        { iso2: "LT", iso3: "LTU", name: "Lithuania", name_fr: "Lituanie", alternates: ["Lietuva"], flag: 116 },
+        { iso2: "LT", iso3: "LTU", name: "Lithuania", name_fr: "Lituanie", alternates: [ "Lietuva" ], flag: 116 },
         { iso2: "LU", iso3: "LUX", name: "Luxembourg", name_fr: "Luxembourg", flag: 117 },
         { iso2: "MO", iso3: "MAC", name: "Macao", name_fr: "Macao", flag: 118 },
-        { iso2: "MK", iso3: "MKD", name: "Macedonia (the former Yugoslav Republic of)", name_fr: "Macédoine (l'ex-République yougoslave de)", alternates: ["Poraneshna Jugoslovenska Republika Makedonija"], flag: 119 },
+        { iso2: "MK", iso3: "MKD", name: "Macedonia (the former Yugoslav Republic of)", name_fr: "Macédoine (l'ex-République yougoslave de)", alternates: [ "Poraneshna Jugoslovenska Republika Makedonija" ], flag: 119 },
         { iso2: "MG", iso3: "MDG", name: "Madagascar", name_fr: "Madagascar", flag: 120 },
         { iso2: "MW", iso3: "MWI", name: "Malawi", name_fr: "Malawi", flag: 121 },
         { iso2: "MY", iso3: "MYS", name: "Malaysia", name_fr: "Malaisie", flag: 122 },
@@ -3082,10 +3082,10 @@
         { iso2: "YT", iso3: "MYT", name: "Mayotte", name_fr: "Mayotte", flag: 0 },
         { iso2: "MX", iso3: "MEX", name: "Mexico", name_fr: "Mexique", flag: 130 },
         { iso2: "FM", iso3: "FSM", name: "Micronesia (the Federated States of)", name_fr: "Micronésie, États fédérés de", flag: 131 },
-        { iso2: "MD", iso3: "MDA", name: "Moldova (the Republic of)", name_fr: "Moldova , République de", flag: 132 },
+        { iso2: "MD", iso3: "MDA", name: "Moldova (the Republic of)", name_fr: "Moldova , République de", flag: 132 },
         { iso2: "MC", iso3: "MCO", name: "Monaco", name_fr: "Monaco", flag: 133 },
         { iso2: "MN", iso3: "MNG", name: "Mongolia", name_fr: "Mongolie", flag: 134 },
-        { iso2: "ME", iso3: "MNE", name: "Montenegro", name_fr: "Monténégro", alternates: ["Crna Gora"], flag: 0 },
+        { iso2: "ME", iso3: "MNE", name: "Montenegro", name_fr: "Monténégro", alternates: [ "Crna Gora" ], flag: 0 },
         { iso2: "MS", iso3: "MSR", name: "Montserrat", name_fr: "Montserrat", flag: 135 },
         { iso2: "MA", iso3: "MAR", name: "Morocco", name_fr: "Maroc", flag: 136 },
         { iso2: "MZ", iso3: "MOZ", name: "Mozambique", name_fr: "Mozambique", flag: 137 },
@@ -3093,7 +3093,7 @@
         { iso2: "NA", iso3: "NAM", name: "Namibia", name_fr: "Namibie", flag: 138 },
         { iso2: "NR", iso3: "NRU", name: "Nauru", name_fr: "Nauru", flag: 139 },
         { iso2: "NP", iso3: "NPL", name: "Nepal", name_fr: "Népal", flag: 140 },
-        { iso2: "NL", iso3: "NLD", name: "Netherlands", name_fr: "Pays-Bas", alternates: ["Holland"], flag: 141 },
+        { iso2: "NL", iso3: "NLD", name: "Netherlands", name_fr: "Pays-Bas", alternates: [ "Holland" ], flag: 141 },
         { iso2: "NC", iso3: "NCL", name: "New Caledonia", name_fr: "Nouvelle-Calédonie", flag: 0 },
         { iso2: "NZ", iso3: "NZL", name: "New Zealand", name_fr: "Nouvelle-Zélande", flag: 142 },
         { iso2: "NI", iso3: "NIC", name: "Nicaragua", name_fr: "Nicaragua", flag: 143 },
@@ -3113,13 +3113,13 @@
         { iso2: "PE", iso3: "PER", name: "Peru", name_fr: "Pérou", flag: 157 },
         { iso2: "PH", iso3: "PHL", name: "Philippines", name_fr: "Philippines", flag: 158 },
         { iso2: "PN", iso3: "PCN", name: "Pitcairn", name_fr: "Pitcairn", flag: 0 },
-        { iso2: "PL", iso3: "POL", name: "Poland", name_fr: "Pologne", alternates: ["Polska"], flag: 159 },
+        { iso2: "PL", iso3: "POL", name: "Poland", name_fr: "Pologne", alternates: [ "Polska" ], flag: 159 },
         { iso2: "PT", iso3: "PRT", name: "Portugal", name_fr: "Portugal", flag: 160 },
         { iso2: "PR", iso3: "PRI", name: "Puerto Rico", name_fr: "Porto Rico", flag: 161 },
         { iso2: "QA", iso3: "QAT", name: "Qatar", name_fr: "Qatar", flag: 162 },
         { iso2: "RE", iso3: "REU", name: "Réunion", name_fr: "Réunion", flag: 0 },
-        { iso2: "RO", iso3: "ROU", name: "Romania", name_fr: "Roumanie", alternates: ["România"], flag: 163 },
-        { iso2: "RU", iso3: "RUS", name: "Russian Federation", name_fr: "Russie (la Fédération de)", alternates: ["Rossiya"], flag: 164 },
+        { iso2: "RO", iso3: "ROU", name: "Romania", name_fr: "Roumanie", alternates: [ "România" ], flag: 163 },
+        { iso2: "RU", iso3: "RUS", name: "Russian Federation", name_fr: "Russie (la Fédération de)", alternates: [ "Rossiya" ], flag: 164 },
         { iso2: "RW", iso3: "RWA", name: "Rwanda", name_fr: "Rwanda", flag: 165 },
         { iso2: "BL", iso3: "BLM", name: "Saint Barthélemy", name_fr: "Saint-Barthélemy", flag: 0 },
         { iso2: "SH", iso3: "SHN", name: "Saint Helena, Ascension and Tristan da Cunha", name_fr: "Sainte-Hélène, Ascension et Tristan da Cunha", flag: 166 },
@@ -3133,26 +3133,26 @@
         { iso2: "ST", iso3: "STP", name: "Sao Tome and Principe", name_fr: "Sao Tomé-et-Principe", flag: 173 },
         { iso2: "SA", iso3: "SAU", name: "Saudi Arabia", name_fr: "Arabie saoudite", flag: 174 },
         { iso2: "SN", iso3: "SEN", name: "Senegal", name_fr: "Sénégal", flag: 175 },
-        { iso2: "RS", iso3: "SRB", name: "Serbia", name_fr: "Serbie", alternates: ["Srbija"], flag: 0 },
+        { iso2: "RS", iso3: "SRB", name: "Serbia", name_fr: "Serbie", alternates: [ "Srbija" ], flag: 0 },
         { iso2: "SC", iso3: "SYC", name: "Seychelles", name_fr: "Seychelles", flag: 176 },
         { iso2: "SL", iso3: "SLE", name: "Sierra Leone", name_fr: "Sierra Leone", flag: 177 },
         { iso2: "SG", iso3: "SGP", name: "Singapore", name_fr: "Singapour", flag: 178 },
         { iso2: "SX", iso3: "SXM", name: "Sint Maarten (Dutch part)", name_fr: "Saint-Martin (partie néerlandaise)", flag: 0 },
-        { iso2: "SK", iso3: "SVK", name: "Slovakia", name_fr: "Slovaquie", alternates: ["Slovenská republika"], flag: 179 },
-        { iso2: "SI", iso3: "SVN", name: "Slovenia", name_fr: "Slovénie", alternates: ["Slovenija"], flag: 180 },
+        { iso2: "SK", iso3: "SVK", name: "Slovakia", name_fr: "Slovaquie", alternates: [ "Slovenská republika" ], flag: 179 },
+        { iso2: "SI", iso3: "SVN", name: "Slovenia", name_fr: "Slovénie", alternates: [ "Slovenija" ], flag: 180 },
         { iso2: "SB", iso3: "SLB", name: "Solomon Islands", name_fr: "Salomon (Îles)", flag: 181 },
         { iso2: "SO", iso3: "SOM", name: "Somalia", name_fr: "Somalie", flag: 182 },
         { iso2: "ZA", iso3: "ZAF", name: "South Africa", name_fr: "Afrique du Sud", flag: 183 },
         { iso2: "GS", iso3: "SGS", name: "South Georgia and the South Sandwich Islands", name_fr: "Géorgie du Sud-et-les Îles Sandwich du Sud", flag: 184 },
         { iso2: "SS", iso3: "SSD", name: "South Sudan ", name_fr: "Soudan du Sud", flag: 0 },
-        { iso2: "ES", iso3: "ESP", name: "Spain", name_fr: "Espagne", alternates: ["España"], flag: 186 },
+        { iso2: "ES", iso3: "ESP", name: "Spain", name_fr: "Espagne", alternates: [ "España" ], flag: 186 },
         { iso2: "LK", iso3: "LKA", name: "Sri Lanka", name_fr: "Sri Lanka", flag: 187 },
         { iso2: "SD", iso3: "SDN", name: "Sudan", name_fr: "Soudan", flag: 188 },
         { iso2: "SR", iso3: "SUR", name: "Suriname", name_fr: "Suriname", flag: 189 },
         { iso2: "SJ", iso3: "SJM", name: "Svalbard and Jan Mayen", name_fr: "Svalbard et l'Île Jan Mayen", flag: 190 },
         { iso2: "SZ", iso3: "SWZ", name: "Swaziland", name_fr: "Swaziland", flag: 191 },
-        { iso2: "SE", iso3: "SWE", name: "Sweden", name_fr: "Suède", alternates: ["Sverige"], flag: 192 },
-        { iso2: "CH", iso3: "CHE", name: "Switzerland", name_fr: "Suisse", alternates: ["Schweiz"], flag: 193 },
+        { iso2: "SE", iso3: "SWE", name: "Sweden", name_fr: "Suède", alternates: [ "Sverige" ], flag: 192 },
+        { iso2: "CH", iso3: "CHE", name: "Switzerland", name_fr: "Suisse", alternates: [ "Schweiz" ], flag: 193 },
         { iso2: "SY", iso3: "SYR", name: "Syrian Arab Republic", name_fr: "République arabe syrienne", flag: 0 },
         { iso2: "TW", iso3: "TWN", name: "Taiwan (Province of China)", name_fr: "Taïwan (Province de Chine)", flag: 194 },
         { iso2: "TJ", iso3: "TJK", name: "Tajikistan", name_fr: "Tadjikistan", flag: 195 },
@@ -3164,22 +3164,22 @@
         { iso2: "TO", iso3: "TON", name: "Tonga", name_fr: "Tonga", flag: 199 },
         { iso2: "TT", iso3: "TTO", name: "Trinidad and Tobago", name_fr: "Trinité-et-Tobago", flag: 200 },
         { iso2: "TN", iso3: "TUN", name: "Tunisia", name_fr: "Tunisie", flag: 201 },
-        { iso2: "TR", iso3: "TUR", name: "Turkey", name_fr: "Turquie", alternates: ["Türkiye"], flag: 202 },
+        { iso2: "TR", iso3: "TUR", name: "Turkey", name_fr: "Turquie", alternates: [ "Türkiye" ], flag: 202 },
         { iso2: "TM", iso3: "TKM", name: "Turkmenistan", name_fr: "Turkménistan", flag: 203 },
         { iso2: "TC", iso3: "TCA", name: "Turks and Caicos Islands", name_fr: "Turks-et-Caïcos (les Îles)", flag: 204 },
         { iso2: "TV", iso3: "TUV", name: "Tuvalu", name_fr: "Tuvalu", flag: 205 },
         { iso2: "UG", iso3: "UGA", name: "Uganda", name_fr: "Ouganda", flag: 206 },
-        { iso2: "UA", iso3: "UKR", name: "Ukraine", name_fr: "Ukraine", alternates: ["Ukraina"], flag: 207 },
-        { iso2: "AE", iso3: "ARE", name: "United Arab Emirates", name_fr: "Émirats arabes unis", alternates: ["UAE"], flag: 208 },
-        { iso2: "GB", iso3: "GBR", name: "United Kingdom", name_fr: "Royaume-Uni", alternates: ["Britain", "England", "Great Britain", "Northern Ireland", "Scotland", "UK", "Wales"], flag: 78 },
-        { iso2: "US", iso3: "USA", name: "United States", name_fr: "États-Unis", alternates: ["America", "United States of America"], flag: 210 },
+        { iso2: "UA", iso3: "UKR", name: "Ukraine", name_fr: "Ukraine", alternates: [ "Ukraina" ], flag: 207 },
+        { iso2: "AE", iso3: "ARE", name: "United Arab Emirates", name_fr: "Émirats arabes unis", alternates: [ "UAE" ], flag: 208 },
+        { iso2: "GB", iso3: "GBR", name: "United Kingdom", name_fr: "Royaume-Uni", alternates: [ "Britain", "England", "Great Britain", "Northern Ireland", "Scotland", "UK", "Wales" ], flag: 78 },
+        { iso2: "US", iso3: "USA", name: "United States", name_fr: "États-Unis", alternates: [ "America", "United States of America" ], flag: 210 },
         { iso2: "UM", iso3: "UMI", name: "United States Minor Outlying Islands", name_fr: "Îles mineures éloignées des États-Unis", flag: 0 },
         { iso2: "UY", iso3: "URY", name: "Uruguay", name_fr: "Uruguay", flag: 209 },
         { iso2: "UZ", iso3: "UZB", name: "Uzbekistan", name_fr: "Ouzbékistan", flag: 211 },
         { iso2: "VU", iso3: "VUT", name: "Vanuatu", name_fr: "Vanuatu", flag: 212 },
-        { iso2: "VE", iso3: "VEN", name: "Venezuela, Bolivarian Republic of ", name_fr: "Venezuela, République bolivarienne du ", flag: 213 },
+        { iso2: "VE", iso3: "VEN", name: "Venezuela, Bolivarian Republic of ", name_fr: "Venezuela, République bolivarienne du ", flag: 213 },
         { iso2: "VN", iso3: "VNM", name: "Viet Nam", name_fr: "Viet Nam", flag: 214 },
-        { iso2: "VG", iso3: "VGB", name: "Virgin Islands (British)", name_fr: "Vierges britanniques (les Îles)", flag: 30 },
+        { iso2: "VG", iso3: "VGB", name: "Virgin Islands (British)", name_fr: "Vierges britanniques (les Îles)", flag: 30 },
         { iso2: "VI", iso3: "VIR", name: "Virgin Islands (U.S.)", name_fr: "Vierges des États-Unis (les Îles)", flag: 215 },
         { iso2: "WF", iso3: "WLF", name: "Wallis and Futuna", name_fr: "Wallis-et-Futuna ", flag: 216 },
         { iso2: "EH", iso3: "ESH", name: "Western Sahara", name_fr: "Sahara occidental", flag: 0 },
@@ -3258,7 +3258,7 @@
 
         countrylist.load = function () {
             pca.addClass(countrylist.autocomplete.element, "pcacountrylist");
-
+            
             //country has been selected
             function selectCountry(country) {
                 countrylist.change(country);
@@ -3267,7 +3267,7 @@
 
             //add countries to the list
             if (countrylist.options.codesList) {
-                var codesSplit = countrylist.options.codesList.replace(/\s/g, "").split(","),
+                var codesSplit =  countrylist.options.codesList.replace(/\s/g, "").split(","),
                     filteredList = [];
 
                 countrylist.autocomplete.clear();
@@ -3276,13 +3276,13 @@
                     var code = codesSplit[i].toString().toUpperCase();
 
                     for (var c = 0; c < pca.countries.length; c++) {
-                        if (pca.countries[c].iso2 == code || pca.countries[c].iso3 == code) {
+                        if  (pca.countries[c].iso2 == code || pca.countries[c].iso3 == code) {
                             filteredList.push(pca.countries[c]);
                             break;
-                        }
+                        } 
                     }
                 }
-
+                
                 if (countrylist.options.fillOthers) {
                     for (var o = 0; o < pca.countries.length; o++) {
                         var contains = false;
@@ -3291,7 +3291,7 @@
                             if (pca.countries[o].iso3 == filteredList[f].iso3)
                                 contains = true;
                         }
-
+                        
                         if (!contains) filteredList.push(pca.countries[o]);
                     }
                 }
@@ -3337,7 +3337,7 @@
             //set the initial value
             if (countrylist.options.value) countrylist.country = countrylist.find(countrylist.options.value);
             if (!countrylist.country && countrylist.options.defaultCode) countrylist.country = countrylist.find(countrylist.options.defaultCode);
-
+            
             //use the fallback or first in the list
             countrylist.country = countrylist.country || (countrylist.options.codesList ? countrylist.first() : countrylist.find(countrylist.options.fallbackCode)) || countrylist.first() || countrylist.find(countrylist.options.fallbackCode);
 
@@ -3346,7 +3346,7 @@
 
         /** Returns the name of the country with the current nameType option. 
         * @param {pca.Country} [country] - The country object to get the desired name of. */
-        countrylist.getName = function (country) {
+        countrylist.getName = function(country) {
             switch (countrylist.options.nameType) {
                 case pca.countryNameType.NAME:
                     return (country || countrylist.country)[countrylist.nameProperty];
@@ -3358,10 +3358,10 @@
 
             return (country || countrylist.country)[countrylist.nameProperty];
         }
-
+        
         /** Returns the value of the country with the current valueType option. 
         * @param {pca.Country} [country] - The country object to get the desired value of. */
-        countrylist.getValue = function (country) {
+        countrylist.getValue = function(country) {
             switch (countrylist.options.valueType) {
                 case pca.countryNameType.NAME:
                     return (country || countrylist.country)[countrylist.nameProperty];
@@ -3376,7 +3376,7 @@
 
         /** Populates all bound country fields. 
         * @fires populate */
-        countrylist.populate = function () {
+        countrylist.populate = function() {
             if (!countrylist.options.populate) return;
 
             var name = countrylist.getName(),
@@ -3385,13 +3385,13 @@
             for (var i = 0; i < countrylist.fields.length; i++) {
                 var countryField = pca.getElement(countrylist.fields[i]),
                     currentValue = pca.getValue(countryField);
-
+                
                 pca.setValue(countryField, (pca.selectList(countryField) ? value : name));
 
                 if (countrylist.options.prepopulate && currentValue != pca.getValue(countryField))
                     pca.fire(countryField, "change");
             }
-
+                
             countrylist.fire("populate");
         }
 
@@ -3404,11 +3404,11 @@
             function isAlternate(item) {
                 if (item.data.alternates) {
                     for (var a = 0; a < item.data.alternates.length; a++) {
-                        if (item.data.alternates[a].toUpperCase() == country)
+                        if (item.data.alternates[a].toUpperCase() == country) 
                             return true;
                     }
                 }
-
+            
                 return false;
             }
 
@@ -3456,7 +3456,7 @@
 
             return flag;
         }
-
+        
         /** Sets the country
         * @param {string} country - The country name or code to change to. */
         countrylist.setCountry = function (country) {
@@ -3705,6 +3705,7 @@
     * @property {pca.CountryList.Options} [countries] - Options for the country list.
     * @property {pca.AutoComplete.Options} [list] - Options for the search list.
     * @property {pca.Address.BarOptions} [bar] - Options for the address control footer bar.
+    * @property {pca.Address.SearchOptions} [search] - Options for control search results.
     */
 
     /** Address searching component.
@@ -3827,14 +3828,14 @@
 
                     if (address.options.suppressAutocomplete) {
                         var elem = pca.getElement(field.element);
-                        if (elem) elem.autocomplete = "pca"; //Chrome will ignore 'off'
+                        if (elem) elem.autocomplete = "off";
                     }
                 }
-
+                   
                 //check for advanced fields
                 field.field = address.checkFormat(field.field);
             }
-
+            
             //set the current language for UI
             address.detectLanguage();
 
@@ -3915,7 +3916,7 @@
             });
 
             //pass through the show event
-            address.countrylist.autocomplete.listen("show", function () {
+            address.countrylist.autocomplete.listen("show", function() {
                 address.fire("show");
             });
 
@@ -3942,7 +3943,7 @@
 
             //clicking the flag button will show the country list
             pca.listen(flagbutton, "click", address.switchToCountrySelect);
-
+            
             //create another flag icon on the country list to close it
             var countryFlagbutton = pca.create("div", { className: "pcaflagbutton" }),
                 countryFlag = address.countrylist.flag();
@@ -3996,12 +3997,12 @@
 
             //get the users country by IP
             if (address.options.setCountryByIP) address.setCountryByIP();
-
+            
             //add ARIA support
             if (options.name) {
                 var listname = options.list.name,
                     countrylistname = options.countries.list.name;
-
+                
                 pca.setAttributes(message, { id: listname + "_label" });
                 pca.setAttributes(flagbutton, { id: listname + "_button", role: "button", "aria-labelledby": listname + "_label" });
                 pca.setAttributes(countryMessage, { id: countrylistname + "_label" });
@@ -4037,7 +4038,7 @@
                     term = term.replace(address.searchContext.search, address.searchContext.text);
                 else
                     address.searchContext = null;
-            }
+            }  
 
             //if the last result is still being used, then filter from the id            
             var lastId = address.searchContext ? (address.searchContext.id || "") : "",
@@ -4051,7 +4052,7 @@
             }
 
             address.fire("search", search);
-
+            
             if (search.searchTerm) {
                 var searchParameters = { Key: address.key, Country: address.country, SearchTerm: search.searchTerm, LanguagePreference: address.language, LastId: search.lastId, SearchFor: address.filteringMode, OrderBy: address.orderingMode, $block: true, $cache: true };
 
@@ -4063,7 +4064,7 @@
 
                 pca.fetch(address.options.provider + "/Interactive/Find/v2.10", searchParameters, success, address.error);
             }
-
+                
 
             return address;
         }
@@ -4157,7 +4158,7 @@
                 else
                     throw pca.messages[address.language].SERVICEERROR + " " + message;
             }
-
+                
         }
 
         //clears any current prompt timer
@@ -4181,7 +4182,7 @@
             address.showFooterLogo();
 
             //add expandable class
-            address.autocomplete.list.collection.all(function (item) {
+            address.autocomplete.list.collection.all(function(item) {
                 if (item.data && item.data.Next && item.data.Next == "Find") pca.addClass(item.element, "pcaexpandable");
             });
 
@@ -4248,9 +4249,9 @@
 
                 if (address.notifcationTimer) window.clearTimeout(address.notifcationTimer);
                 pca.removeClass(address.messageBox, "pcafade");
-                address.notifcationTimer = window.setTimeout(function () {
+                address.notifcationTimer = window.setTimeout(function() {
                     pca.addClass(address.messageBox, "pcafade");
-                    window.setTimeout(function () {
+                    window.setTimeout(function() {
                         pca.removeClass(address.messageBox, "pcavisible");
                     }, 500);
                 }, messageOptions.notificationTimeout);
@@ -4304,7 +4305,7 @@
                     pca.setValue(address.autocomplete.field, searchText + " ");
                     address.autocomplete.field.focus();
                 }
-
+                
                 address.searchContext = { id: suggestion.Id, text: suggestion.Text, search: searchText };
                 address.search(searchText);
             }
@@ -4326,23 +4327,19 @@
                 var suggestion = suggestions[s],
                     highlights;
 
-                //set the item title
-                suggestion.title = suggestion.Text;
-                //set the filter tag
-                suggestion.tag = suggestion.Text;
+                //initial values are all the same
+                suggestion.HighlightedText = suggestion.title = suggestion.tag = suggestion.Text;
 
                 //no highlight indexes
-                if (!suggestion.Highlight) {
-                    suggestion.HighlightedText = suggestion.Text;
+                if (!suggestion.Highlight)
                     continue;
-                }
 
                 highlights = suggestion.Highlight.split(",");
 
                 for (var i = highlights.length - 1; i >= 0; i--) {
                     var indexes = highlights[i].split("-");
 
-                    suggestion.HighlightedText = suggestion.Text.substring(0, parseInt(indexes[0])) + prefix + suggestion.Text.substring(parseInt(indexes[0]), parseInt(indexes[1])) + suffix + suggestion.Text.substring(parseInt(indexes[1]), suggestion.Text.length);
+                    suggestion.HighlightedText = suggestion.HighlightedText.substring(0, parseInt(indexes[0])) + prefix + suggestion.HighlightedText.substring(parseInt(indexes[0]), parseInt(indexes[1])) + suffix + suggestion.HighlightedText.substring(parseInt(indexes[1]), suggestion.HighlightedText.length);
                 }
             }
         }
@@ -4381,12 +4378,10 @@
 
             //replace with additional address line formats
             for (var la = 1; la <= 5; la++) {
-                if (addressLineFields["Line" + la]) addressLineCount++;
-
-                for (var fa = 0; fa < address.fields.length; fa++)
-                    address.fields[fa].field = address.fields[fa].field.replace(/(Formatted)?Line/g, "FormattedLine");
+                if (addressLineFields["Line" + la])
+                    addressLineCount++;
             }
-
+      
             if (addressLineFields.Building && addressLineFields.Street) addressLineCount++;
 
             //add additional formatted address lines
@@ -4409,7 +4404,8 @@
                 if ((field.mode & pca.fieldMode.PRESERVE) && pca.getValue(field.element) && address.autocomplete.field != pca.getElement(field.element)) continue;
 
                 //process format strings and/or field names
-                var value = /[\{\}]/.test(field.field) || field.field == "" ? pca.formatLine(detail, field.field) : detail[field.field];
+                var format = address.fields[a].field.replace(/(Formatted)?Line/g, "FormattedLine"),
+                    value = /[\{\}]/.test(format) || format == "" ? pca.formatLine(detail, format) : detail[format];
 
                 pca.setValue(field.element, value);
             }
@@ -4533,7 +4529,7 @@
             address.autocomplete.setWidth(width);
             address.countrylist.autocomplete.setWidth(width);
         }
-
+        
         /** Sets the height of the control.
         * @param {number|string} height - The height in pixels for the control. */
         address.setHeight = function (height) {
@@ -4611,12 +4607,12 @@
 
         /** Return the visible state of the control.
         * @returns {boolean} True if the control is visible. */
-        address.visible = function () {
+        address.visible = function() {
             return address.autocomplete.visible || address.countrylist.autocomplete.visible;
         }
 
         /** Repositions the address control. */
-        address.reposition = function () {
+        address.reposition = function() {
             address.autocomplete.reposition();
             address.countrylist.autocomplete.reposition();
         }
@@ -4643,7 +4639,7 @@
         }
 
         /** Reloads the address control */
-        address.reload = function () {
+        address.reload = function() {
             address.destroy();
             address.load();
         }
@@ -4682,11 +4678,11 @@
 
             return false;
         }
-
+        
         /** Checks a format string for non-standard fields.
         * @param {string} format - The address line format string to check.
         * @returns {string} The standardised format string. */
-        address.checkFormat = function (format) {
+        address.checkFormat = function(format) {
             function standardField(field) {
                 for (var i in pca.exampleAddress) {
                     if (i == field) return true;

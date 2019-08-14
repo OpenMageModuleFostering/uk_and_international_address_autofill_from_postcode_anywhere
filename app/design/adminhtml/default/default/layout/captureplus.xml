@@ -57,4 +57,10 @@
             </action>
         </reference>
     </adminhtml_sales_order_create_load_block_shipping_address>
+
+  <adminhtml_system_config_edit>
+    <reference name="content">
+      <block type="captureplus/scriptaccount" name="captureplus_scriptaccount"  template="captureplus/scriptaccount.phtml" />
+    </reference>
+  </adminhtml_system_config_edit>
 </layout>

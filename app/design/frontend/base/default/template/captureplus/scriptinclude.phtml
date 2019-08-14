@@ -45,12 +45,12 @@
                     magentoCountries.push(countryField.options[c].value);
             
                 var fields = [
-                    { element: addressFields.Company, field: "Company" },
+                    { element: addressFields.Company, field: "Company", mode: pca.fieldMode.DEFAULT | pca.fieldMode.PRESERVE },
                     { element: addressFields.Line1, field: "Line1" },
-                    { element: addressFields.Line2, field: "Line2" },
-                    { element: addressFields.City, field: "City" },
-                    { element: addressFields.State, field: "ProvinceName" },
-                    { element: addressFields.StateSelect, field: "ProvinceName" },
+                    { element: addressFields.Line2, field: "Line2", mode: pca.fieldMode.POPULATE },
+                    { element: addressFields.City, field: "City", mode: pca.fieldMode.POPULATE },
+                    { element: addressFields.State, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
+                    { element: addressFields.StateSelect, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
                     { element: addressFields.Postcode, field: "PostalCode" },
                     { element: addressFields.CountrySelect, field: "CountryIso2", mode: pca.fieldMode.COUNTRY }
                 ],
@@ -76,6 +76,7 @@
             }   
         }
         
+        pca.fuzzyMatch = false;
         pca.ready(load);
     })();
 //]]>

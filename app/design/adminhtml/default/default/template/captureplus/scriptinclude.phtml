@@ -49,7 +49,8 @@
                     countries: { 
                         codesList: magentoCountries.join(","), 
                         valueType: pca.countryNameType.ISO2 
-                    }
+                    },
+                    source: "magento-admin"
                 },
                 control = new pca.Address(fields, options);        
                 
@@ -83,6 +84,22 @@
                             StateSelect: "_item" + newAddressIndex + "region_id",
                             Postcode: "_item" + newAddressIndex + "postcode",
                             CountrySelect: "_item" + newAddressIndex + "country_id"
+                        });
+                    }
+                }
+                
+                //launch for existing addresses
+                for (var i = 1; i <= customerAddresses.itemCount; i++) {
+                    if (pca.getElement("_item" + i + "street0")) {
+                        createAddressControl({
+                            Company: "_item" + i + "company",
+                            Line1: "_item" + i + "street0",
+                            Line2: "_item" + i + "street1",
+                            City: "_item" + i + "city",
+                            State: "_item" + i + "region",
+                            StateSelect: "_item" + i + "region_id",
+                            Postcode: "_item" + i + "postcode",
+                            CountrySelect: "_item" + i + "country_id"
                         });
                     }
                 }

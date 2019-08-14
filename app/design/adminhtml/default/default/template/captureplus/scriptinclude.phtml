@@ -118,7 +118,7 @@
               var activeItemIndex = 1;
               
               if (customerAddresses.activeItem && customerAddresses.activeItem.id)
-                  activeItemIndex = parseInt(customerAddresses.activeItem.id[customerAddresses.activeItem.id.length - 1]);
+                  activeItemIndex = parseInt(/\d+$/.exec(customerAddresses.activeItem.id));
               
               //launch for existing addresses
               for (var i = 1; i <= (activeItemIndex + customerAddresses.itemCount); i++) {

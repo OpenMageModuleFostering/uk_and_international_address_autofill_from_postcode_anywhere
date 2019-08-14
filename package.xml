@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package>
+    <name>UK_and_International_Address_AutoFill_from_Postcode_Anywhere</name>
+    <version>2.0.0</version>
+    <stability>stable</stability>
+    <license>GNU General Public License (GPL)</license>
+    <channel>community</channel>
+    <extends/>
+    <summary>Capture+ is the latest in UK &amp; international address verification for the Magento e-commerce platform.</summary>
+    <description>Capture+ is the latest in UK &amp; international address verification for the Magento e-commerce platform.</description>
+    <notes>- Capture+ searching&#xD;
+- New UI API&#xD;
+- Cleaned up settings&#xD;
+- No more external JS</notes>
+    <authors><author><name>Postcode Anywhere</name><user>admin</user><email>magneto@postcodeanywhere.co.uk</email></author></authors>
+    <date>2013-04-04</date>
+    <time>10:33:22</time>
+    <contents><target name="magecommunity"><dir name="PostcodeAnywhere"><dir name="CapturePlus"><dir name="Block"><file name="ScriptInclude.php" hash="b6491d8ff2bc0a1d2a65c969a44a3fea"/></dir><dir name="Helper"><file name="Data.php" hash="cc7779ad6288bb2ef0c0e9ff1f4d47ba"/></dir><dir name="etc"><file name="config.xml" hash="528e78688791b29a1f2223eb3155f8f2"/><file name="system.xml" hash="c2ada0e2b26e078b2a5ab79fcf216116"/></dir></dir></dir></target><target name="mageweb"><dir name="js"><dir name="captureplus"><file name="address-3.00.js" hash="94d8afa1ab98b8a9886e1596d9da9838"/><file name="address-3.00.min.js" hash="268f1ffc506f7ad8f2077c6873bb735b"/></dir></dir></target><target name="mageskin"><dir name="frontend"><dir name="base"><dir name="default"><dir name="captureplus"><file name="toolkit-3.00.css" hash="617b87956016a71ec93e2b1bdb8190a2"/><file name="toolkit-3.00.min.css" hash="9b07dcbda45137a82d2d3bf755bc848c"/></dir></dir></dir></dir><dir name="adminhtml"><dir name="default"><dir name="default"><dir name="captureplus"><file name="toolkit-3.00.css" hash="617b87956016a71ec93e2b1bdb8190a2"/><file name="toolkit-3.00.min.css" hash="9b07dcbda45137a82d2d3bf755bc848c"/></dir></dir></dir></dir></target><target name="magedesign"><dir name="frontend"><dir name="base"><dir name="default"><dir name="layout"><file name="captureplus.xml" hash="a70f65e0e4f6c38096e5948995aaa785"/></dir><dir name="template"><dir name="captureplus"><file name="scriptinclude.phtml" hash="902255d53b04b7965a11e8edc677714c"/></dir></dir></dir></dir></dir><dir name="adminhtml"><dir name="default"><dir name="default"><dir name="layout"><file name="captureplus.xml" hash="c72ccc618ea4fcf17be2ca361646a7dd"/></dir><dir name="template"><dir name="captureplus"><file name="scriptinclude.phtml" hash="a2a407f1f88603de556682427bdbf071"/><file name="scriptreload.phtml" hash="d5e5a51aee7c400162ff9add0da873bb"/></dir></dir></dir></dir></dir></target><target name="mage"><dir name="app"><dir name="etc"><dir name="modules"><file name="PostcodeAnywhere_CapturePlus.xml" hash="f85647da22967c8e5154bc5df525fe61"/></dir></dir></dir></target></contents>
+    <compatible/>
+    <dependencies><required><php><min>5.0.0</min><max>6.0.0</max></php></required></dependencies>
+</package>

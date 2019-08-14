@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/UK_and_International_Address_AutoFill_from_Postcode_Anywhere",
+    "type": "magento-module",
+    "license": "GNU-General-Public-License-(GPL)",
+    "homepage": "",
+    "description": "Capture+ is the latest in UK & international address verification for the Magento e-commerce platform.",
+    "authors": [
+    {
+        "name": "Postcode Anywhere",
+        "email": "magneto@postcodeanywhere.co.uk"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}

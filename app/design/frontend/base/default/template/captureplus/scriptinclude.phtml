@@ -51,48 +51,22 @@
                     { element: addressFields.City, field: "City" },
                     { element: addressFields.State, field: "ProvinceName" },
                     { element: addressFields.StateSelect, field: "ProvinceName" },
-                    { element: addressFields.Postcode, field: "PostalCode" }
+                    { element: addressFields.Postcode, field: "PostalCode" },
+                    { element: addressFields.CountrySelect, field: "CountryIso2", mode: pca.fieldMode.COUNTRY }
                 ],
                 options = { 
                     key: key,
-                    countries: { codesList: magentoCountries.join(",") }
+                    suppressAutocomplete: true,
+                    countries: { 
+                        codesList: magentoCountries.join(","), 
+                        valueType: pca.countryNameType.ISO2 
+                    }
                 },
                 control = new pca.Address(fields, options);
-                
-                control.listen("prepopulate", function(address) {
-                    setCountry(address.CountryCode2);
-                });
-
-                control.listen("country", function(country) {
-                    setCountry(country.iso2);
-                });
-
-                function setCountry(iso2) {
-                    var currentIndex = countryField.selectedIndex;
-                    pca.setValue(countryField, iso2);
-
-                    if (countryField.selectedIndex != currentIndex)
-                        pca.fire(countryField, "change");
-                }
-
-                function getCountry() {
-                    var currentCountry = pca.getValue(countryField);
-
-                    control.setCountry(currentCountry);
-                    
-                    if (countryByIP)
-                        control.setCountryByIP();
-                }
-
-                for (var i = 0; i < fields.length; i++) {
-                    var field = pca.getElement(fields[i].element);
-                        
-                    if (field)
-                        field.autocomplete = "off";
-                }
-
-                pca.listen(countryField, "change", getCountry);
-                getCountry();
+               
+                //perform IP country lookup if required
+                if (countryByIP)
+                    control.setCountryByIP();
             }
     
             for (var i = 0; i < magentoFields.length; i++) {

@@ -22,7 +22,8 @@
                 Postcode: "order-shipping_address_postcode",
                 CountrySelect: "order-shipping_address_country_id"
             }
-        ];
+        ],
+        key = '<?php echo Mage::getStoreConfig('captureplus/settings/admin_key'); ?>';
     
         function load() {
             function createAddressControl(addressFields) {
@@ -39,51 +40,23 @@
                     { element: addressFields.City, field: "City" },
                     { element: addressFields.State, field: "ProvinceName" },
                     { element: addressFields.StateSelect, field: "ProvinceName" },
-                    { element: addressFields.Postcode, field: "PostalCode" }
+                    { element: addressFields.Postcode, field: "PostalCode" },
+                    { element: addressFields.CountrySelect, field: "CountryIso2", mode: pca.fieldMode.COUNTRY }
                 ],
                 options = { 
-                    key: '<?php echo Mage::getStoreConfig('captureplus/settings/admin_key'); ?>',
-                    countries: { codesList: magentoCountries.join(",") }
+                    key: key,
+                    suppressAutocomplete: true,
+                    countries: { 
+                        codesList: magentoCountries.join(","), 
+                        valueType: pca.countryNameType.ISO2 
+                    }
                 },
                 control = new pca.Address(fields, options);        
-                
-                control.listen("prepopulate", function(address) {
-                    setCountry(address.CountryCode2);
-                });
-
-                control.listen("country", function(country) {
-                    setCountry(country.iso2);
-                });
                 
                 control.listen("populate", function() {
                     pca.fire(pca.getElement(addressFields.State), "change");
                     pca.fire(pca.getElement(addressFields.StateSelect), "change");
                 });
-
-                function setCountry(iso2) {
-                    var currentIndex = countryField.selectedIndex;
-                    pca.setValue(countryField, iso2);
-
-                    if (countryField.selectedIndex != currentIndex)
-                        pca.fire(countryField, "change");
-                }
-
-                function getCountry() {
-                    var currentCountry = pca.getValue(countryField);
-
-                    if (currentCountry)
-                        control.countrylist.change(control.countrylist.find(currentCountry));
-                }
-
-                for (var i = 0; i < fields.length; i++) {
-                    var field = pca.getElement(fields[i].element);
-                        
-                    if (field)
-                        field.autocomplete = "off";
-                }
-
-                pca.listen(countryField, "change", getCountry);
-                getCountry();
             }
     
             for (var i = 0; i < magentoFields.length; i++) {

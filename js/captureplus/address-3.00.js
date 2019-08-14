@@ -3,7 +3,7 @@
 * Address v3.00
 * Component for address lookup integrations.
 *
-* WEB-1-3 15/04/2013 08:43:09
+* WEB-1-2 24/05/2013 14:28:04
 */
 
 (function (window, undefined) {
@@ -11,7 +11,7 @@
         document = window.document;
 
     ///<summary>Service target information</summary>
-    pca.protocol = (window.parent || window).location.protocol == "https:" ? "https:" : "http:";
+    pca.protocol = (window.location || document.location).protocol == "https:" ? "https:" : "http:";
     pca.host = "services.postcodeanywhere.co.uk";
     pca.endpoint = "json3.ws";
     pca.limit = 2000;
@@ -880,12 +880,13 @@
         autocomplete.container = null;
         autocomplete.anchors = [];
         autocomplete.list = new pca.List();
+        autocomplete.fieldListeners = [];
         autocomplete.field = null;
+        autocomplete.positionField = null;
         autocomplete.visible = true;
         autocomplete.hover = false;
         autocomplete.focused = false;
         autocomplete.disabled = false;
-        autocomplete.positionField = null;
 
         ///<summary>Header element.</summary>
         autocomplete.header = {
@@ -988,6 +989,11 @@
         ///<summary>Attach the list to a field.</summary>
         autocomplete.attach = function (field) {
 
+            function bindFieldEvent(f, event, action) {
+                pca.listen(f, event, action);
+                autocomplete.fieldListeners.push({ field: f, event: event, action: action });
+            }
+
             function anchorToField(f) {
                 var anchor = pca.create("table", { className: "anchor", cellPadding: 0, cellSpacing: 0 }),
                     chain = [anchor.insertRow(0).insertCell(0), anchor.insertRow(1).insertCell(0)],
@@ -1014,12 +1020,16 @@
                 chain[1].appendChild(link);
                 autocomplete.anchors.push(container);
 
-                pca.listen(f, "keyup", autocomplete.keyup);
-                pca.listen(f, "focus", focus);
-                pca.listen(f, "blur", autocomplete.blur);
-                pca.listen(f, "keypress", autocomplete.keypress);
-                pca.listen(f, "click", autocomplete.click);
-                pca.listen(f, "dblclick", autocomplete.dblclick);
+                if (pca.inputField(f)) {
+                    bindFieldEvent(f, "keyup", autocomplete.keyup);
+                    bindFieldEvent(f, "focus", focus);
+                    bindFieldEvent(f, "blur", autocomplete.blur);
+                    bindFieldEvent(f, "keypress", autocomplete.keypress);
+                }
+
+                bindFieldEvent(f, "click", function () { autocomplete.click(f); });
+                bindFieldEvent(f, "dblclick", function () { autocomplete.dblclick(f); });
+                bindFieldEvent(f, "change", function () { autocomplete.change(f); });
             }
 
             function positionAdjacentField(f) {
@@ -1035,12 +1045,16 @@
                 //check the field
                 if (!f || !f.tagName) return;
 
-                pca.listen(f, "keyup", autocomplete.keyup);
-                pca.listen(f, "focus", focus);
-                pca.listen(f, "blur", autocomplete.blur);
-                pca.listen(f, "keypress", autocomplete.keypress);
-                pca.listen(f, "click", autocomplete.click);
-                pca.listen(f, "dblclick", autocomplete.dblclick);
+                if (pca.inputField(f)) {
+                    bindFieldEvent(f, "keyup", autocomplete.keyup);
+                    bindFieldEvent(f, "focus", focus);
+                    bindFieldEvent(f, "blur", autocomplete.blur);
+                    bindFieldEvent(f, "keypress", autocomplete.keypress);
+                }
+
+                bindFieldEvent(f, "click", function () { autocomplete.click(f); });
+                bindFieldEvent(f, "dblclick", function () { autocomplete.dblclick(f); });
+                bindFieldEvent(f, "change", function () { autocomplete.change(f); });
             }
 
             function addToPageContainer() {
@@ -1086,7 +1100,8 @@
             }
 
             //set minimum width for field
-            autocomplete.element.style.minWidth = pca.getSize(field).width + "px";
+            var ownBorderWidth = (parseInt(pca.getStyle(autocomplete.element, "borderLeftWidth")) + parseInt(pca.getStyle(autocomplete.element, "borderRightWidth"))) || 0;
+            autocomplete.element.style.minWidth = (pca.getSize(field).width - ownBorderWidth) + "px";
             autocomplete.positionField = field;
 
             return autocomplete;
@@ -1177,13 +1192,18 @@
         }
 
         //field has been clicked
-        autocomplete.click = function () {
-            autocomplete.fire("click");
+        autocomplete.click = function (f) {
+            autocomplete.fire("click", f);
         }
 
         //field has been double clicked
-        autocomplete.dblclick = function () {
-            autocomplete.fire("dblclick");
+        autocomplete.dblclick = function (f) {
+            autocomplete.fire("dblclick", f);
+        }
+
+        //field value has been changed
+        autocomplete.change = function (f) {
+            autocomplete.fire("change", f);
         }
 
         ///<summary>Add items to the autocomplete list.</summary>
@@ -1226,6 +1246,17 @@
             autocomplete.list.collection.count ? autocomplete.show() : autocomplete.hide();
 
             return autocomplete;
+        }
+
+        ///<summary>Removes the autocomplete elements and event listeners from the page.</summary>
+        autocomplete.destroy = function () {
+            if (autocomplete.container)
+                document.body.removeChild(autocomplete.container);
+
+            pca.ignore(document, "click", autocomplete.checkHide);
+
+            for (var i = 0; i < autocomplete.fieldListeners.length; i++)
+                pca.ignore(autocomplete.fieldListeners[i].field, autocomplete.fieldListeners[i].event, autocomplete.fieldListeners[i].action);
         }
 
         autocomplete.element.appendChild(autocomplete.header.element);
@@ -1531,14 +1562,30 @@
                 }
             }
             else if (element.tagName == "DIV" || element.tagName == "SPAN" || element.tagName == "TD")
-                element.innerHTML = valueText.replace("\n", "<br/>");
+                element.innerHTML = valueText.replace(/\n/g, "<br/>");
         }
     }
 
     ///<summary>Returns true if the element is a text input field.</summary>
     pca.inputField = function (element) {
         if (element = pca.getElement(element))
-            return (element.tagName && (element.tagName == "INPUT" || element.tagName == "TEXTAREA") && element.type && (element.type == "text" || element.type == "textarea"))
+            return (element.tagName && (element.tagName == "INPUT" || element.tagName == "TEXTAREA") && element.type && (element.type == "text" || element.type == "textarea"));
+
+        return false;
+    }
+
+    ///<summary>Returns true if the element is a select list field.</summary>
+    pca.selectList = function (element) {
+        if (element = pca.getElement(element))
+            return (element.tagName && element.tagName == "SELECT");
+
+        return false;
+    }
+
+    ///<summary>Returns true if the element is a checkbox.</summary>
+    pca.checkBox = function (element) {
+        if (element = pca.getElement(element))
+            return (element.tagName && element.tagName == "INPUT" && element.type && element.type == "checkbox");
 
         return false;
     }
@@ -1621,9 +1668,7 @@
 
     ///<summary>Get the element which an element is positioned relative to.</summary>
     pca.getTopOffsetParent = function (element) {
-        var positionStyle = "";
-
-        while (element.offsetParent && positionStyle != "fixed") {
+        while (element.offsetParent) {
             element = element.offsetParent;
 
             //fix for firefox
@@ -1659,7 +1704,7 @@
     pca.applyStyleFixes = function (selectorText, fixes) {
         for (var s = 0; s < document.styleSheets.length; s++) {
             var sheet = document.styleSheets[s],
-                rules = sheet.rules || sheet.cssRules || [];
+                rules = sheet.rules || sheet.cssRules || []; //possible denial of access if script and css are hosted separately
 
             for (var r = 0; r < rules.length; r++) {
                 var rule = rules[r];
@@ -1682,6 +1727,14 @@
 
         for (var i = 0; i < fixesList.length; i++)
             pca.applyStyleFixes(fixesList[i].selectorText, fixesList[i].fixes)
+    }
+
+    ///<summary>Creates a stylesheet from cssText.</summary>
+    pca.createStyleSheet = function (cssText) {
+        if (document.createStyleSheet)
+            document.createStyleSheet().cssText = cssText;
+        else
+            document.head.appendChild(pca.create("style", { type: "text/css", innerHTML: cssText }));
     }
 
     ///<summary>Simple function to create an element.</summary>
@@ -1741,22 +1794,8 @@
     //namespace
     var pca = window.pca = window.pca || {};
 
-    ///<summary>Creates an autocomplete list with country options.</summary>
-    pca.CountryList = function (fields, options) {
-        var countrylist = new pca.Object(this);
-
-        countrylist.fields = fields || [];
-        countrylist.options = options || {};
-
-        countrylist.options.defaultCode = countrylist.options.defaultCode || "";
-        countrylist.options.codesList = countrylist.options.codesList || "";
-        countrylist.options.fillOthers = countrylist.options.fillOthers || false;
-        countrylist.options.list = countrylist.options.list || {};
-
-        countrylist.template = "<div class='flag'></div><div class='flaglabel'>{name}</div>";
-        countrylist.autocomplete = new pca.AutoComplete(countrylist.fields, countrylist.options.list);
-        countrylist.countries = [
-            { iso2: "AF", iso3: "AFG", name: "Afghanistan", flag: 1 },
+    pca.countries = [
+        { iso2: "AF", iso3: "AFG", name: "Afghanistan", flag: 1 },
         { iso2: "AX", iso3: "ALA", name: "Åland Islands", flag: 220 },
         { iso2: "AL", iso3: "ALB", name: "Albania", flag: 2 },
         { iso2: "DZ", iso3: "DZA", name: "Algeria", flag: 3 },
@@ -2005,7 +2044,37 @@
         { iso2: "YE", iso3: "YEM", name: "Yemen", flag: 217 },
         { iso2: "ZM", iso3: "ZMB", name: "Zambia", flag: 218 },
         { iso2: "ZW", iso3: "ZWE", name: "Zimbabwe", flag: 219 }
-        ];
+    ];
+
+    ///<summary>Input field modes.</summary>
+    ///<remarks>Bitset values.</remarks>
+    pca.countryNameType = {
+        NAME: 0,
+        ISO2: 1,
+        ISO3: 2
+    };
+
+    ///<summary>Creates an autocomplete list with country options.</summary>
+    pca.CountryList = function (fields, options) {
+        var countrylist = new pca.Object(this);
+
+        countrylist.fields = fields || [];
+        countrylist.options = options || {};
+
+        countrylist.options.defaultCode = countrylist.options.defaultCode || "";
+        countrylist.options.value = countrylist.options.value || "";
+        countrylist.options.codesList = countrylist.options.codesList || "";
+        countrylist.options.fillOthers = countrylist.options.fillOthers || false;
+        countrylist.options.list = countrylist.options.list || {};
+        countrylist.options.populate = typeof countrylist.options.populate == 'boolean' ? countrylist.options.populate : true;
+        countrylist.options.prepopulate = typeof countrylist.options.prepopulate == 'boolean' ? countrylist.options.prepopulate : true;
+        countrylist.options.nameType = countrylist.options.nameType || pca.countryNameType.NAME;
+        countrylist.options.valueType = countrylist.options.valueType || pca.countryNameType.ISO3;
+
+        countrylist.template = "<div class='pcaflag'></div><div class='flaglabel'>{name}</div>";
+        countrylist.autocomplete = new pca.AutoComplete(countrylist.fields, countrylist.options.list);
+        countrylist.country = null;
+        countrylist.textChanged = false;
 
         countrylist.load = function () {
             pca.addClass(countrylist.autocomplete.element, "countrylist");
@@ -2020,30 +2089,30 @@
                 for (var i = 0; i < codesSplit.length; i++) {
                     var code = codesSplit[i].toString().toUpperCase();
 
-                    for (var c = 0; c < countrylist.countries.length; c++) {
-                        if (countrylist.countries[c].iso2 == code || countrylist.countries[c].iso3 == code) {
-                            filteredList.push(countrylist.countries[c]);
+                    for (var c = 0; c < pca.countries.length; c++) {
+                        if (pca.countries[c].iso2 == code || pca.countries[c].iso3 == code) {
+                            filteredList.push(pca.countries[c]);
                             break;
                         }
                     }
                 }
 
                 if (countrylist.options.fillOthers) {
-                    for (var o = 0; o < countrylist.countries.length; o++) {
+                    for (var o = 0; o < pca.countries.length; o++) {
                         var contains = false;
 
                         for (var f = 0; f < filteredList.length; f++) {
-                            if (countrylist.countries[o].iso3 == filteredList[f].iso3)
+                            if (pca.countries[o].iso3 == filteredList[f].iso3)
                                 contains = true;
                         }
 
-                        if (!contains) filteredList.push(countrylist.countries[o]);
+                        if (!contains) filteredList.push(pca.countries[o]);
                     }
                 }
 
                 countrylist.autocomplete.clear().add(filteredList, countrylist.template, countrylist.change);
             }
-            else countrylist.autocomplete.clear().add(countrylist.countries, countrylist.template, countrylist.change);
+            else countrylist.autocomplete.clear().add(pca.countries, countrylist.template, countrylist.change);
 
             //set flags and add alternate filter tags to each country
             countrylist.autocomplete.list.collection.all(function (item) {
@@ -2056,11 +2125,74 @@
                 countrylist.autocomplete.showAll();
             });
 
+            function textChanged(field) {
+                countrylist.setCountry(pca.getValue(field));
+                countrylist.textChanged = false;
+            }
+
+            //automatically set the country when the field value is changed
+            countrylist.autocomplete.listen("change", function (field) {
+                countrylist.autocomplete.visible ? countrylist.textChanged = true : textChanged(field);
+            });
+
+            countrylist.autocomplete.listen("hide", function () {
+                if (countrylist.textChanged) textChanged(countrylist.autocomplete.field);
+            });
+
             //set the initial value
-            if (countrylist.options.defaultCode) countrylist.country = countrylist.find(countrylist.options.defaultCode);
+            if (countrylist.options.value) countrylist.country = countrylist.find(countrylist.options.value);
+            if (!countrylist.country && countrylist.options.defaultCode) countrylist.country = countrylist.find(countrylist.options.defaultCode);
             countrylist.country = countrylist.country || countrylist.first();
 
             countrylist.fire("load");
+        }
+
+        ///<summary>Returns the name of the country with the current nameType option.</summary>
+        countrylist.getName = function (country) {
+            switch (countrylist.options.nameType) {
+                case pca.countryNameType.NAME:
+                    return (country || countrylist.country).name;
+                case pca.countryNameType.ISO2:
+                    return (country || countrylist.country).iso2;
+                case pca.countryNameType.ISO3:
+                    return (country || countrylist.country).iso3;
+            }
+
+            return (country || countrylist.country).name;
+        }
+
+        ///<summary>Returns the value of the country with the current valueType option.</summary>
+        countrylist.getValue = function (country) {
+            switch (countrylist.options.valueType) {
+                case pca.countryNameType.NAME:
+                    return (country || countrylist.country).name;
+                case pca.countryNameType.ISO2:
+                    return (country || countrylist.country).iso2;
+                case pca.countryNameType.ISO3:
+                    return (country || countrylist.country).iso3;
+            }
+
+            return (country || countrylist.country).iso3;
+        }
+
+        ///<summary>Populates all bound country fields.</summary>
+        countrylist.populate = function () {
+            if (!countrylist.options.populate) return;
+
+            var name = countrylist.getName(),
+                value = countrylist.getValue();
+
+            for (var i = 0; i < countrylist.fields.length; i++) {
+                var countryField = pca.getElement(countrylist.fields[i]),
+                    currentValue = pca.getValue(countryField);
+
+                pca.setValue(countryField, (pca.selectList(countryField) ? value : name));
+
+                if (countrylist.options.prepopulate && currentValue != pca.getValue(countryField))
+                    pca.fire(countryField, "change");
+            }
+
+            countrylist.fire("populate");
         }
 
         ///<summary>Finds a matching country from a name or code.</summary>
@@ -2088,19 +2220,24 @@
             return countrylist.autocomplete.list.collection.first().data;
         }
 
+        ///<summary>Country is selected.</summary>
         countrylist.change = function (country) {
             if (country) {
                 countrylist.country = country;
+                countrylist.populate();
+                countrylist.textChanged = false;
                 countrylist.fire("change", countrylist.country);
             }
         }
 
+        ///<summary>Sets the index of a flag icon element.</summary>
         countrylist.setFlagPosition = function (element, index) {
             element.style.backgroundPosition = "-1px -" + (index * 16 + 2) + "px";
         }
 
+        ///<summary>Creates a dynamic flag icon.</summary>
         countrylist.flag = function () {
-            var flag = pca.create("div", { className: "flag" });
+            var flag = pca.create("div", { className: "pcaflag" });
 
             function updateFlag(country) {
                 countrylist.setFlagPosition(flag, country.flag);
@@ -2142,6 +2279,7 @@
     ///<remarks>Bitset values.</remarks>
     pca.fieldMode = {
         DEFAULT: 3,
+        NONE: 0,
         SEARCH: 1,
         POPULATE: 2,
         PRESERVE: 4,
@@ -2171,48 +2309,55 @@
         address.options = options || {};
         address.key = address.options.key || "";
 
+        address.options.source = address.options.source || "";
+        address.options.application = address.options.application || "";
+        address.options.populate = typeof address.options.populate == 'boolean' ? address.options.populate : true;
+        address.options.onlyInputs = typeof address.options.onlyInputs == 'boolean' ? address.options.onlyInputs : false;
+        address.options.autoSearch = typeof address.options.autoSearch == 'boolean' ? address.options.autoSearch : false;
+        address.options.minSearch = address.options.minSearch || 1;
+        address.options.maxItems = address.options.maxItems || 0;
+        address.options.suppressAutocomplete = typeof address.options.suppressAutocomplete == 'boolean' ? address.options.suppressAutocomplete : false;
+
         address.options.countries = address.options.countries || {};
         address.options.countries.defaultCode = address.options.countries.defaultCode || "" || "" || "GBR";
+        address.options.countries.value = address.options.countries.value || "";
+        address.options.countries.prepopulate = typeof address.options.countries.prepopulate == 'boolean' ? address.options.countries.prepopulate : true;
         address.options.list = address.options.list || {};
         address.options.bar = address.options.bar || {};
+        address.options.bar.visible = typeof address.options.bar.visible == 'boolean' ? address.options.bar.visible : true;
 
         address.countryCode = address.options.countries.defaultCode;
         address.first = false;
+        address.searchAfterCountry = false;
 
         address.autocomplete = null;
         address.countrylist = null;
 
-        address.location = null;
+        address.geolocation = null;
 
         address.load = function () {
             var searchFields = [],
-                countryFields = [],
-                searchAfterCountry = false;
+                countryFields = [];
 
+            //create a list of search and country fields
             for (var f = 0; f < address.fields.length; f++) {
                 var field = address.fields[f];
-                field.mode = field.mode || pca.fieldMode.DEFAULT;
 
-                if (!pca.inputField(field.element)) continue; //must be an input field to search
+                field.mode = field.mode || pca.fieldMode.DEFAULT;
 
                 if (field.mode & pca.fieldMode.COUNTRY)
                     countryFields.push(field.element);
                 else if (field.mode & pca.fieldMode.SEARCH)
                     searchFields.push(field.element);
-            }
 
-            //Create an autocomplete list to display search results
-            address.autocomplete = new pca.AutoComplete(searchFields, address.options.list);
-
-            //search if needed
-            function searchField() {
-                var term = pca.getValue(address.autocomplete.field);
-
-                if (term && !address.first) {
-                    address.first = true;
-                    address.search(term);
+                if (address.options.suppressAutocomplete) {
+                    var elem = pca.getElement(field.element);
+                    if (elem) elem.autocomplete = "off";
                 }
             }
+
+            //create an autocomplete list to display search results
+            address.autocomplete = new pca.AutoComplete(searchFields, address.options.list);
 
             //listen for the user typing something
             address.autocomplete.listen("keyup", function (key) {
@@ -2220,7 +2365,10 @@
             });
 
             //show just the bar when a field gets focus
-            address.autocomplete.listen("focus", address.reset);
+            address.autocomplete.listen("focus", address.focus);
+
+            //listen to blur event for custom code
+            address.autocomplete.listen("blur", address.blur);
 
             //search on double click
             address.autocomplete.listen("dblclick", searchField);
@@ -2235,14 +2383,19 @@
                 address.first = false;
             });
 
+            //get initial country value
+            if (!address.options.countries.value && countryFields.length)
+                address.options.countries.value = pca.getValue(countryFields[0]);
+
             //create a countrylist to change the current country
             address.countrylist = new pca.CountryList(countryFields, address.options.countries);
+            address.countryCode = address.countrylist.country.iso3;
 
             //when the country is changed update the address list
             address.countrylist.listen("change", function (country) {
                 address.countryCode = country && country.iso3 ? country.iso3 : address.options.countries.defaultCode;
 
-                if (searchAfterCountry) {
+                if (address.searchAfterCountry) {
                     address.autocomplete.field.focus();
                     searchField();
                 }
@@ -2253,7 +2406,7 @@
 
             //if they close the list do not search next time a country is picked
             address.countrylist.autocomplete.listen("hide", function () {
-                searchAfterCountry = false;
+                address.searchAfterCountry = false;
             });
 
             //create a flag icon and add to the footer of the search list
@@ -2263,26 +2416,24 @@
             address.autocomplete.footer.setContent(flagbutton).show();
 
             //clicking the flag button will show the country list
-            pca.listen(flagbutton, "click", function () {
-                address.autocomplete.hide();
-                address.countrylist.autocomplete.position(address.autocomplete.field);
-                address.countrylist.autocomplete.showAll();
-                address.countrylist.autocomplete.hover = true;
-                searchAfterCountry = true;
-            });
+            pca.listen(flagbutton, "click", address.showCountrylist);
 
             //create another flag icon on the country list to close it
             var countryFlagbutton = pca.create("div", { className: "flagbutton" }),
                 countryFlag = address.countrylist.flag();
             countryFlagbutton.appendChild(countryFlag)
-            address.countrylist.autocomplete.footer.setContent(countryFlagbutton).show();
+            address.countrylist.autocomplete.footer.setContent(countryFlagbutton);
+
+            //check if search bar is visible
+            if (address.options.bar.visible)
+                address.countrylist.autocomplete.footer.show();
 
             //clicking the flag button will hide the country list
             pca.listen(countryFlagbutton, "click", function () {
-                if (searchAfterCountry) {
+                if (address.searchAfterCountry) {
                     address.autocomplete.field.focus();
                     searchField();
-                }
+                };
 
                 address.countrylist.autocomplete.hide();
             });
@@ -2314,6 +2465,16 @@
             address.countrylist.autocomplete.footer.setContent(countryMessage);
         }
 
+        //search if needed
+        function searchField() {
+            var term = pca.getValue(address.autocomplete.field);
+
+            if (term && !address.first && term.length >= address.options.minSearch) {
+                address.first = true;
+                address.search(term);
+            }
+        }
+
         ///<summary>Takes a partial search string and gets matches for it.</summary>
         address.search = function (term) {
 
@@ -2321,51 +2482,64 @@
                 if (response.length)
                     address.showresults(response, address.templates.AUTOCOMPLETE);
                 else
-                    address.message(address.messages.NOADDRESS);
+                    address.message(address.messages.NOADDRESS, true);
             }
 
             address.fire("search", term);
 
             if (term)
                 pca.fetch("CapturePlus/Interactive/AutoComplete/v2.00", { Key: address.key, Country: address.countryCode, SearchTerm: term, $block: true, $cache: true }, success, address.error);
+
+            return address;
         }
 
         ///<summary>Searches using the current browser/devices location.</summary>
-        ///<remarks>Only supported in HTML5.</remarks>
-        address.searchByLocation = function () {
+        ///<remarks>Browser location only supported in HTML5.</remarks>
+        address.searchByLocation = function (latitude, longitude) {
+            var location = "",
+                accuracy = 0;
 
+            //managed to get browser location
             function gotLocation(response) {
                 if (response && response.coords) {
-                    var location = response.coords.latitude + "," + response.coords.longitude,
-                        accuracy = response.coords.accuracy;
+                    location = response.coords.latitude + "," + response.coords.longitude;
+                    accuracy = response.coords.accuracy;
 
-                    address.location = response.coords;
-                    pca.debug(location + "|" + accuracy);
+                    address.geolocation = response.coords;
 
-                    pca.fetch("CapturePlus/Interactive/AutoComplete/v2.00", { Key: address.key, Location: location, LocationAccuracy: accuracy, $block: true, $cache: true }, success, address.error);
+                    fetchLocation();
                 }
                 else
                     noLocation();
             }
 
-            function success(response) {
-                if (response.length) {
-                    pca.debug("got results");
-                    address.showresults(response, address.templates.AUTOCOMPLETE);
+            function noLocation() {
+                address.message(address.messages.NOLOCATION, true);
+            }
+
+            //retrieve address results
+            function fetchLocation() {
+                function success(response) {
+                    if (response.length)
+                        address.showresults(response, address.templates.AUTOCOMPLETE);
+                    else
+                        address.message(address.messages.NOADDRESS, true);
                 }
 
-                else
-                    address.message(address.messages.NOADDRESS);
+                pca.fetch("CapturePlus/Interactive/AutoComplete/v2.00", { Key: address.key, Location: location, LocationAccuracy: accuracy, $block: true, $cache: true }, success, address.error);
             }
 
-            function noLocation() {
-                address.message(address.messages.NOLOCATION);
+            //latitude and longitude could be 0
+            if ((latitude || latitude == 0) && (longitude || longitude == 0)) {
+                location = latitude + "," + longitude;
+                fetchLocation();
             }
-
-            if (navigator.geolocation)
+            else if (navigator.geolocation)
                 navigator.geolocation.getCurrentPosition(gotLocation, noLocation, { enableHighAccuracy: true });
             else
                 noLocation();
+
+            return address;
         }
 
         ///<summary>Looks up a location result when the user selects one.</summary>
@@ -2375,7 +2549,7 @@
                 if (response.length)
                     address.showresults(response, address.templates.AUTOCOMPLETEFIND);
                 else
-                    address.message(address.messages.NOADDRESS);
+                    address.message(address.messages.NOADDRESS, true);
             }
 
             pca.fetch("CapturePlus/Interactive/AutoCompleteFind/v2.00", { Key: address.key, Id: id }, success, address.error);
@@ -2388,7 +2562,7 @@
                 response.length ? address.populate(response) : address.error(address.messages.NOADDRESS);
             }
 
-            pca.fetch("CapturePlus/Interactive/RetrieveById/v2.00", { Key: address.key, Id: id }, success, address.error);
+            pca.fetch("CapturePlus/Interactive/RetrieveById/v2.00", { Key: address.key, Id: id, Application: address.options.application, Source: address.options.source }, success, address.error);
         }
 
         ///<summary>Handles an error from the service.</summary>
@@ -2402,20 +2576,24 @@
             address.autocomplete.clear().add(results, template, address.select).show()
             address.autocomplete.header.hide();
             address.showFooterLogo();
+            return address;
         }
 
         ///<summary>Shows a message in the autocomplete.</summary>
-        address.message = function (text) {
+        address.message = function (text, noResults) {
             address.reset();
             address.autocomplete.show();
             address.autocomplete.header.setText(text).show();
             address.showFooterMessage();
+            if (noResults) address.autocomplete.clear().list.hide();
+            return address;
         }
 
         ///<summary>User has selected something, either an address or location.</summary>
         address.select = function (suggestion) {
             address.fire("select", suggestion);
             suggestion.IsRetrievable ? address.retrieve(suggestion.Id) : address.lookup(suggestion.Id);
+            return address;
         }
 
         ///<summary>Populate the fields with the address result.</summary>
@@ -2423,13 +2601,20 @@
             details = getAddressObject(details);
 
             address.autocomplete.hide();
+
+            if (address.options.countries.prepopulate)
+                address.countrylist.populate();
+
             address.fire("prepopulate", details);
 
-            for (var a = 0; a < address.fields.length; a++) {
+            for (var a = 0; a < address.fields.length && address.options.populate; a++) {
                 var field = address.fields[a];
 
                 //skip this field if it's not set to be populated
                 if (!(field.mode & pca.fieldMode.POPULATE)) continue;
+
+                //skip the field if it's not an input field and the onlyInputs option is set
+                if (address.options.onlyInputs && !(pca.inputField(field.element) || pca.selectList(field.element) || pca.checkBox(field.element))) continue;
 
                 //skip this field if it's in preserve mode, already had a value and is not the search field
                 if ((field.mode & pca.fieldMode.PRESERVE) && pca.getValue(field.element) && address.autocomplete.field != pca.getElement(field.element)) continue;
@@ -2439,6 +2624,7 @@
 
             address.first = false;
             address.fire("populate", details);
+            return address;
         }
 
         ///<summary>Gets an object representation of the address response</summary>
@@ -2500,6 +2686,20 @@
             return result;
         }
 
+        ///<summary>Switches to the countrylist.</summary>
+        address.showCountrylist = function () {
+            address.autocomplete.hide();
+            address.countrylist.autocomplete.position(address.autocomplete.field);
+            address.countrylist.autocomplete.showAll();
+            address.countrylist.autocomplete.hover = true;
+            address.searchAfterCountry = true;
+        }
+
+        ///<summary>Hides the countrylist.</summary>
+        address.hideCountrylist = function () {
+            address.countrylist.autocomplete.hide();
+        }
+
         ///<summary>Sets the country for searching</summary>
         ///<param name="country">The country name or code to change to.</param>
         address.setCountry = function (country) {
@@ -2522,15 +2722,59 @@
             return address;
         }
 
+        ///<summary>Address control has focus.</summary>
+        address.focus = function () {
+            address.reset();
+
+            if (address.options.autoSearch)
+                searchField();
+
+            address.fire("focus");
+        }
+
+        ///<summary>Address control has lost.</summary>
+        address.blur = function () {
+            address.fire("blur");
+        }
+
         ///<summary>Reset the control back to it's initial state.</summary>
         address.reset = function () {
-            address.autocomplete.list.clear().hide();
-            address.autocomplete.header.hide();
-            address.showFooterMessage();
+            if (address.options.bar.visible) {
+                address.autocomplete.list.clear().hide();
+                address.autocomplete.header.hide();
+                address.showFooterMessage();
+            }
+            else {
+                address.autocomplete.hide();
+                address.autocomplete.footer.hide();
+            }
+
             address.first = false;
             return address;
         }
 
+        ///<summary>Disables the address control.</summary>
+        address.disable = function () {
+            address.autocomplete.disabled = true;
+            address.countrylist.autocomplete.disabled = true;
+            return address;
+        }
+
+        ///<summary>Enables the address control after being disabled.</summary>
+        address.enable = function () {
+            address.autocomplete.disabled = false;
+            address.countrylist.autocomplete.disabled = false;
+            return address;
+        }
+
+        ///<summary>Perminantly removes the address control elements and event listeners from the page.</summary>
+        address.destroy = function () {
+            address.autocomplete.destroy();
+            address.countrylist.autocomplete.destroy();
+            return address;
+        }
+
+        //only load when the page is ready
         pca.ready(address.load);
     }
 })();

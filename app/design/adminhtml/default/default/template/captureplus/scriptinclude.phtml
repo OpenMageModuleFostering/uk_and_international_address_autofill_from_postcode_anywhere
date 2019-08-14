@@ -1,162 +1,90 @@
+<?php
+$pcaAccCode = Mage::getStoreConfig('captureplus/settings/account_code');
+$pcaCustomCode = Mage::getStoreConfig('captureplus/settings/custom_code');
+if($pcaAccCode) {
+?>
+
 <script type="text/javascript">
+
+      (function (a, c, b, e) {
+    a[b] = a[b] || {}; a[b].initial = { accountCode: "<?php echo $pcaAccCode; ?>", host: "<?php echo $pcaAccCode; ?>.pcapredict.com" };
+    a[b].on = a[b].on || function () { (a[b].onq = a[b].onq || []).push(arguments) }; var d = c.createElement("script");
+    d.async = !0; d.src = e; c = c.getElementsByTagName("script")[0]; c.parentNode.insertBefore(d, c)
+    })(window, document, "pca", "//<?php echo $pcaAccCode; ?>.pcapredict.com/js/sensor.js");
+
 //<![CDATA[
-  (function() {
-      var magento = pca.magento = pca.magento || {};
+    (function() {
+     var magento = pca.magento = pca.magento || {};
      
-      magento.fields = [
-          {
-              Company: "order-billing_address_company",
-              Line1: "order-billing_address_street0",
-              Line2: "order-billing_address_street1",
-              City: "order-billing_address_city",
-              State: "order-billing_address_region",
-              StateSelect: "order-billing_address_region_id",
-              Postcode: "order-billing_address_postcode",
-              CountrySelect: "order-billing_address_country_id"
-          },
-          {
-              Company: "order-shipping_address_company",
-              Line1: "order-shipping_address_street0",
-              Line2: "order-shipping_address_street1",
-              City: "order-shipping_address_city",
-              State: "order-shipping_address_region",
-              StateSelect: "order-shipping_address_region_id",
-              Postcode: "order-shipping_address_postcode",
-              CountrySelect: "order-shipping_address_country_id"
-          },
-          {
-              Company: "company",
-              Line1: "street0",
-              Line2: "street1",
-              City: "city",
-              State: "region",
-              StateSelect: "region_id",
-              Postcode: "postcode",
-              CountrySelect: "country_id"
-          }
-      ];
+     magento.controls = magento.controls || [];
+     var capturePlusFields = [];
       
-      magento.key = '<?php echo Mage::getStoreConfig('captureplus/settings/admin_key'); ?>';
-      magento.countryByIP = !!<?php echo Mage::getStoreConfig('captureplus/settings/ip_country'); ?>;
-      magento.controls = magento.controls || [];
-
-      //load address forms
-      magento.load = function() {
-          function createAddressControl(addressFields) {
-              var countryField = pca.getElement(addressFields.CountrySelect),
-                  magentoCountries = [];
-                
-              for (var c = 0; c < countryField.options.length; c++)
-                  magentoCountries.push(countryField.options[c].value);
+      pca.on('data', function(source, key, address, variations) {
+            console.log(source);
+            console.log(key);
+            console.log(address);
+            console.log(variations);
             
-              var fields = [
-                  { element: addressFields.Company, field: "Company", mode: pca.fieldMode.DEFAULT | pca.fieldMode.PRESERVE },
-                  { element: addressFields.Line1, field: "Line1" },
-                  { element: addressFields.Line2, field: "Line2", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.City, field: "City", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.State, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.StateSelect, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.Postcode, field: "PostalCode" },
-                  { element: addressFields.CountrySelect, field: "CountryIso2", mode: pca.fieldMode.COUNTRY }
-              ],
-              options = { 
-                  key: magento.key,
-                  suppressAutocomplete: true,
-                  countries: { 
-                      codesList: magentoCountries.join(","), 
-                      valueType: pca.countryNameType.ISO2 
-                  },
-                  source: "magento-admin"
-              },
-              control = new pca.Address(fields, options);
-              
-              //fire the change event for all address fields. This helps with some AJAX functionality
-              control.listen("populate", function() {
-                  for (var i in addressFields) {
-                      if (addressFields[i] == addressFields.CountrySelect) continue; //no not fire event for country, it will cause postback
-                      
-                      pca.fire(pca.getElement(addressFields[i]), "change");
-                  }
-              });
-              
-              //Custom code from Settings
-              <?php echo Mage::getStoreConfig('captureplus/settings/custom_code'); ?>
-              //End custom code from Settings
-              
-              magento.controls.push(control);
-          }
-          
-          //do not load if there is no key
-          if (!magento.key) return;
-          
-          //check for address forms on the page
-          for (var i = 0; i < magento.fields.length; i++) {
-              if (pca.getElement(magento.fields[i].Line1))
-                  createAddressControl(magento.fields[i]);
-          }
-          
-          //check for customer edit dynamic addresses
-          if (typeof customerAddresses != 'undefined') {
-              var addNewAddressFunction = customerAddresses.addNewAddress.bind(customerAddresses);
-
-              customerAddresses.addNewAddress = function () {
-                  addNewAddressFunction();
+            for (var i = 0; i < capturePlusFields.length; i++) {
+                var el = document.getElementById(capturePlusFields[i].element);
+                if (el) {
+                    pca.fire(el, 'change');
+                }
+            }
+        });
+        
+            magento.canLoad = function() {
+            // check to see if we have the form fields                    
+            if (pca
+                && pca.platform
+                && typeof pca.platform.elementExists === 'function' 
+                && (pca.platform.elementExists("order-billing_address_street0")
+                || pca.platform.elementExists("_item1street0"))) {
                     
-                  var newAddressIndex = customerAddresses.itemCount;
+                //load pca
+                pca.load();
+            }
+            else {
+                // re-set the timout
+                window.setTimeout(magento.canLoad, 500);
+            }
+        }
+        
+        
+        magento.onload = function(func) {
+            // assign any pre-defined functions on 'window.onload' to a variable
+            var oldOnLoad = window.onload;
+            // if there is not any function hooked to it
+            if (typeof window.onload !== 'function') {
+                // you can hook your function with it
+                window.onload = func
+            } else { // someone already hooked a function
+                window.onload = function () {
+                    // call the function hooked already
+                    oldOnLoad();
+                    // call your awesome function
+                    func();
+                }
+            }
+        }
 
-                  if (pca.getElement("_item" + newAddressIndex + "street0")) {
-                      createAddressControl({
-                          Company: "_item" + newAddressIndex + "company",
-                          Line1: "_item" + newAddressIndex + "street0",
-                          Line2: "_item" + newAddressIndex + "street1",
-                          City: "_item" + newAddressIndex + "city",
-                          State: "_item" + newAddressIndex + "region",
-                          StateSelect: "_item" + newAddressIndex + "region_id",
-                          Postcode: "_item" + newAddressIndex + "postcode",
-                          CountrySelect: "_item" + newAddressIndex + "country_id"
-                      });
-                  }
-              }
-              
-              //load up existing customer addresses
-              for (var i = 0; i < customerAddresses.formContainer.children.length; i++) {
-                  var addressIndex = parseInt(/\d+$/.exec(customerAddresses.formContainer.children[i].id));
-                  
-                  if (pca.getElement("_item" + addressIndex + "street0")) {
-                      createAddressControl({
-                          Company: "_item" + addressIndex + "company",
-                          Line1: "_item" + addressIndex + "street0",
-                          Line2: "_item" + addressIndex + "street1",
-                          City: "_item" + addressIndex + "city",
-                          State: "_item" + addressIndex + "region",
-                          StateSelect: "_item" + addressIndex + "region_id",
-                          Postcode: "_item" + addressIndex + "postcode",
-                          CountrySelect: "_item" + addressIndex + "country_id"
-                      });
-                  }
-              }
-          }
-      }
-      
-      //set the country based on user location
-      magento.setCountryByIp = function() {
-          function success(response) {
-              if (response.length && response[0].Iso3) {
-                  for (var i = 0; i < magento.controls.length; i++)
-                      magento.controls[i].setCountry(response[0].Iso3);
-              }
-          }
+        //wait for the page to be ready
+        magento.onload(function() {
+            window.setTimeout(magento.canLoad, 500);
+        });
 
-          if (magento.key) pca.fetch("Extras/Web/Ip2Country/v1.10", { Key: magento.key }, success);
-      }
+        pca.on('ready', function ()
+        {
+            pca.sourceString = 'MagentoExtension-v3.0.3';
+        })
 
-      //wait for the page to be ready
-      pca.ready(function() {
-          pca.fuzzyMatch = false;
-      
-          //load controls for address forms
-          magento.load();
-      });
+            <?php
+    if($pcaCustomCode) {
+        echo $pcaCustomCode;
+    }
+    ?>
+        
     })();
 //]]>
 </script>
+<?php }

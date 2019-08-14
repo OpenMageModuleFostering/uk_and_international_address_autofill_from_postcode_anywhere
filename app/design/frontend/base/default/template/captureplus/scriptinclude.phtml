@@ -1,120 +1,88 @@
+<?php
+$pcaAccCode = Mage::getStoreConfig('captureplus/settings/account_code');
+$pcaCustomCode = Mage::getStoreConfig('captureplus/settings/custom_code');
+if($pcaAccCode) {
+?>
+
 <script type="text/javascript">
+
+      (function (a, c, b, e) {
+    a[b] = a[b] || {}; a[b].initial = { accountCode: "<?php echo $pcaAccCode; ?>", host: "<?php echo $pcaAccCode; ?>.pcapredict.com" };
+    a[b].on = a[b].on || function () { (a[b].onq = a[b].onq || []).push(arguments) }; var d = c.createElement("script");
+    d.async = !0; d.src = e; c = c.getElementsByTagName("script")[0]; c.parentNode.insertBefore(d, c)
+    })(window, document, "pca", "//<?php echo $pcaAccCode; ?>.pcapredict.com/js/sensor.js");
+
 //<![CDATA[
   (function() {
-      var magento = pca.magento = pca.magento || {};
+     var magento = pca.magento = pca.magento || {};
      
-      magento.fields = [
-          {
-              Company: "billing:company",
-              Line1: "billing:street1",
-              Line2: "billing:street2",
-              City: "billing:city",
-              State: "billing:region",
-              StateSelect: "billing:region_id",
-              Postcode: "billing:postcode",
-              CountrySelect: "billing:country_id" 
-          },
-          {
-              Company: "shipping:company",
-              Line1: "shipping:street1",
-              Line2: "shipping:street2",
-              City: "shipping:city",
-              State: "shipping:region",
-              StateSelect: "shipping:region_id",
-              Postcode: "shipping:postcode",
-              CountrySelect: "shipping:country_id"
-          },
-          {
-              Company: "company",
-              Line1: "street_1",
-              Line2: "street_2",
-              City: "city",
-              State: "region",
-              StateSelect: "region_id",
-              Postcode: "zip",
-              CountrySelect: "country"
-          }
-      ];
+     magento.controls = magento.controls || [];
+     var capturePlusFields = [];
       
-      magento.key = '<?php echo Mage::getStoreConfig('captureplus/settings/website_key'); ?>';
-      magento.countryByIP = !!<?php echo Mage::getStoreConfig('captureplus/settings/ip_country'); ?>;
-      magento.controls = magento.controls || [];
-
-      //load address forms
-      magento.load = function() {
-          function createAddressControl(addressFields) {
-              var countryField = pca.getElement(addressFields.CountrySelect),
-                  magentoCountries = [];
-                
-              for (var c = 0; c < countryField.options.length; c++)
-                  magentoCountries.push(countryField.options[c].value);
+      pca.on('data', function(source, key, address, variations) {
+            console.log(source);
+            console.log(key);
+            console.log(address);
+            console.log(variations);
             
-              var fields = [
-                  { element: addressFields.Company, field: "Company", mode: pca.fieldMode.DEFAULT | pca.fieldMode.PRESERVE },
-                  { element: addressFields.Line1, field: "Line1" },
-                  { element: addressFields.Line2, field: "Line2", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.City, field: "City", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.State, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.StateSelect, field: "ProvinceName", mode: pca.fieldMode.POPULATE },
-                  { element: addressFields.Postcode, field: "PostalCode" },
-                  { element: addressFields.CountrySelect, field: "CountryIso2", mode: pca.fieldMode.COUNTRY }
-              ],
-              options = { 
-                  key: magento.key,
-                  suppressAutocomplete: true,
-                  countries: { 
-                      codesList: magentoCountries.join(","), 
-                      valueType: pca.countryNameType.ISO2 
-                  },
-                  source: "magento"
-              },
-              control = new pca.Address(fields, options);
-              
-              //fire the change event for One Step Checkout - they have a 1 second delay coded in
-              control.listen("populate", function() {
-                  pca.fire(pca.getElement(addressFields.Postcode), "change");
-                  window.setTimeout(function() { pca.fire(pca.getElement(addressFields.StateSelect), "change"); }, 1000);
-              });
-              
-              //Custom code from Settings
-              <?php echo Mage::getStoreConfig('captureplus/settings/custom_code'); ?>
-              //End custom code from Settings
-              
-              magento.controls.push(control);
-          }
-          
-          //do not load if there is no key
-          if (!magento.key) return;
-          
-          //check for address forms on the page
-          for (var i = 0; i < magento.fields.length; i++) {
-              if (pca.getElement(magento.fields[i].Line1))
-                  createAddressControl(magento.fields[i]);
-          }
-      }
-      
-      //set the country based on user location
-      magento.setCountryByIp = function() {
-          function success(response) {
-              if (response.length && response[0].Iso3) {
-                  for (var i = 0; i < magento.controls.length; i++)
-                      magento.controls[i].setCountry(response[0].Iso3);
-              }
-          }
+            for (var i = 0; i < capturePlusFields.length; i++) {
+                var el = document.getElementById(capturePlusFields[i].element);
+                if (el) {
+                    pca.fire(el, 'change');
+                }
+            }
+        });
+        
+            magento.canLoad = function() {
+            // check to see if we have the form fields                    
+            if (pca
+                && pca.platform
+                && typeof pca.platform.elementExists === 'function' 
+                && (pca.platform.elementExists("billing:street1"))) {
+                    
+                //load pca
+                pca.load();
+            }
+            else {
+                // re-set the timout
+                window.setTimeout(magento.canLoad, 500);
+            }
+        }
+        
+        magento.onload = function(func) {
+            // assign any pre-defined functions on 'window.onload' to a variable
+            var oldOnLoad = window.onload;
+            // if there is not any function hooked to it
+            if (typeof window.onload !== 'function') {
+                // you can hook your function with it
+                window.onload = func
+            } else { // someone already hooked a function
+                window.onload = function () {
+                    // call the function hooked already
+                    oldOnLoad();
+                    // call your awesome function
+                    func();
+                }
+            }
+        }
 
-          if (magento.key) pca.fetch("Extras/Web/Ip2Country/v1.10", { Key: magento.key }, success);
-      }
+        //wait for the page to be ready
+        magento.onload(function() {
+            window.setTimeout(magento.canLoad, 500);
+        });
 
-      //wait for the page to be ready
-      pca.ready(function() {
-          pca.fuzzyMatch = false;
-      
-          //load controls for address forms
-          magento.load();
+        pca.on('ready', function ()
+        {
+            pca.sourceString = 'MagentoExtension-v3.0.3';
+        })
+        
+    <?php
+    if($pcaCustomCode) {
+        echo $pcaCustomCode;
+    }
+    ?>
 
-          //perform IP country lookup if required
-          if (magento.countryByIP) magento.setCountryByIp();
-      });
     })();
 //]]>
 </script>
+<?php }

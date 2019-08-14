@@ -3,10 +3,10 @@
     "type": "magento-module",
     "license": "GNU-General-Public-License-(GPL)",
     "homepage": "",
-    "description": "Capture+ is the latest in UK & international address verification for the Magento e-commerce platform.",
+    "description": "Capture+ is the latest in UK & international address verification for the Magento ecommerce platform.",
     "authors": [
     {
-        "name": "Postcode Anywhere",
+        "name": "PCA Predict",
         "email": "magneto@postcodeanywhere.co.uk"
     }
 ],

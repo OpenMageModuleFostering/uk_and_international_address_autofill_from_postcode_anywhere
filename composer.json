@@ -1,5 +1,5 @@
 {
-    "name": "OpenMageModuleFostering\/UK_and_International_Address_AutoFill_from_Postcode_Anywhere",
+    "name": "openmage-module-fostering\/uk_and_international_address_autofill_from_postcode_anywhere",
     "type": "magento-module",
     "license": "GNU-General-Public-License-(GPL)",
     "homepage": "",
